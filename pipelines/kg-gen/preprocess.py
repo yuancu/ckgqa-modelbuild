@@ -8,6 +8,8 @@ import json
 import boto3
 from tqdm import tqdm
 
+from utils import upload_to_s3
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -23,8 +25,10 @@ def trans(raw, processed):
             schemas.add(a['predicate'])
     
     # Create id:predicate dicts
-    id2predicate = {i+1:j for i,j in enumerate(schemas)} # 0表示终止类别
+    id2predicate = {i+1:j for i,j in enumerate(schemas)}
+    id2predicate[0] = 'UNK'
     predicate2id = {j:i for i,j in id2predicate.items()}
+    predicate2id['UNK'] = 0
 
     # Save processed schema
     with open(f"{processed}/schema.json", 'w', encoding='utf-8') as f:
@@ -63,9 +67,14 @@ def trans(raw, processed):
 
 
 if __name__ == "__main__":
+    '''
+    $ python preprocess.py --input-data s3://sm-nlp-data/ie-baseline/raw/DuIE_2_0.zip --output-dir s3://sm-nlp-data/ie-baseline/train/
+    '''
+    
     logger.debug("Starting preprocessing.")
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-data", type=str, required=True)
+    parser.add_argument("--output-dir", type=str, required=False)
     args = parser.parse_args()
 
     base_dir = "/opt/ml/processing/ie"
@@ -90,8 +99,16 @@ if __name__ == "__main__":
     
     # Transform raw data
     trans(raw, processed)
-    # delete downloaded and raw data
+    # Delete downloaded and raw data
     os.unlink(fn)
     os.unlink(f"{raw}/schema.json")
     os.unlink(f"{raw}/train.json")
     os.unlink(f"{raw}/dev.json")
+    
+    # Upload processed data to s3
+    if args.output_dir is not None:
+        bucket = args.output_dir.split("/")[2]
+        prefix = "/".join(args.output_dir.split("/")[3:])
+        upload_to_s3(bucket, prefix, f"{processed}/train.json")
+        upload_to_s3(bucket, prefix, f"{processed}/dev.json")
+        upload_to_s3(bucket, prefix, f"{processed}/schema.json")

@@ -211,6 +211,8 @@ if __name__ == "__main__":
     pathlib.Path(f"{args.model_dir}/resources").mkdir(parents=True, exist_ok=True)
     with open(f"{args.model_dir}/resources/id2predicate.json", 'w', encoding='utf-8') as f:
         json.dump(id2predicate, f, indent=4, ensure_ascii=False)
+    with open(f"{args.model_dir}/resources/config.json", 'w') as f:
+        json.dump(vars(args), f)
     pathlib.Path(f"{args.model_dir}/code").mkdir(parents=True, exist_ok=True)
     shutil.copy('./requirements.txt', f"{args.model_dir}/code/")
     shutil.copy('./inference.py', f"{args.model_dir}/code/")

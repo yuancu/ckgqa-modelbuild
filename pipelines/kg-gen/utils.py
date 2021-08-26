@@ -101,7 +101,8 @@ def extract_spoes(texts, token_ids, offset_mappings, subject_model, object_model
                                 offset_mapping = offset_mappings[k]
                                 obj_text_head = offset_mapping[_start][0]
                                 obj_text_tail = offset_mapping[_end][-1]
-                                predicate_text = id2predicate[int(predicate1.item())]
+                                # id2predicate has str keys
+                                predicate_text = id2predicate[str(int(predicate1.item()))]
                                 object_text = text[obj_text_head: obj_text_tail]
                                 if not any(t in object_text for t in bad_tokens):
                                     spoes.append(

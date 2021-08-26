@@ -28,7 +28,6 @@ def trans(raw, processed):
     id2predicate = {i+1:j for i,j in enumerate(schemas)}
     id2predicate[0] = 'UNK'
     predicate2id = {j:i for i,j in id2predicate.items()}
-    predicate2id['UNK'] = 0
 
     # Save processed schema
     with open(f"{processed}/schema.json", 'w', encoding='utf-8') as f:

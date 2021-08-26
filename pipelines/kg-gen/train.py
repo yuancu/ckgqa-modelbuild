@@ -37,8 +37,14 @@ def parse_args():
     parser.add_argument('--output-data-dir', type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
     parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument('--train', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
-    parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TEST'])
-    parser.add_argument('--schema', type=str)
+    parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
+    parser.add_argument('--schema', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
+    
+#     parser.add_argument('--output-data-dir', type=str)
+#     parser.add_argument('--model-dir', type=str)
+#     parser.add_argument('--train', type=str)
+#     parser.add_argument('--test', type=str)
+#     parser.add_argument('--schema', type=str)
     
     # Model-specific parameters
     parser.add_argument('--bert-model-name', type=str, default='bert-base-chinese')
@@ -54,7 +60,6 @@ def parse_args():
 
 def get_train_loader(args):
     train_data = json.load(open(f"{args.train}/train.json"))
-    train_data = train_data[:2]
     _, predicate2id = json.load(open(f"{args.schema}/schema.json"))
     train_dataset = TrainDataset(train_data, args.bert_model_name, args.max_sent_len, predicate2id)
     train_loader = DataLoader(
@@ -69,7 +74,6 @@ def get_train_loader(args):
 
 def get_test_loader(args):
     test_data = json.load(open(f"{args.test}/dev.json"))
-    test_data = test_data[:2]
     test_dataset = DevDataset(test_data, args.bert_model_name, args.max_sent_len)
     test_loader = DataLoader(
         dataset=test_dataset,      # torch TensorDataset format
@@ -92,11 +96,12 @@ def get_model(args):
 
 def get_tb_writer(args):
     now = datetime.now()
-    dt_string = now.strftime("%m_%d_%H_%M")
+    dt_str = now.strftime("%m_%d_%H_%M")
+    dt_str = '2021_Aug' if dt_str is None else dt_str
     if args.logname == '':
-        log_dir = os.path.join(args.output_data_dir, 'tb', dt_string)
+        log_dir = os.path.join(args.output_data_dir, 'tb', dt_str)
     else:
-        log_dir = os.path.join(args.output_data_dir, 'tb', args.logname + '_' + dt_string)
+        log_dir = os.path.join(args.output_data_dir, 'tb', args.logname + '_' + dt_str)
     writer = SummaryWriter(log_dir=log_dir)
     logger.info(f"Tensorboard logs are saved at {log_dir}")
     return writer
@@ -159,7 +164,7 @@ def evaluate(subject_model, object_model, loader, id2predicate, epoch, writer=No
 if __name__ == "__main__":
     '''
     invoke:
-    python train.py --output-data-dir ./output --output-model ./output  --train /opt/ml/processing/ie/data/processed --test /opt/ml/processing/ie/data/processed --schema /opt/ml/processing/ie/data/processed
+    python train.py --output-data-dir ./output --model-dir ./output  --train /opt/ml/processing/ie/data/processed --test /opt/ml/processing/ie/data/processed --schema /opt/ml/processing/ie/data/processed
     '''
 
     args, _ = parse_args()
@@ -188,13 +193,15 @@ if __name__ == "__main__":
     
     id2predicate, _ = json.load(open(f"{args.schema}/schema.json"))
     
+    best_f1 = 0
     for e in range(args.epochs):
-        train(subject_model, object_model, train_loader, optimizer, e, device=device, writer=writer, log_interval=10)
-        if e > 100 and e % 5 == 0:
+        train(subject_model, object_model, train_loader, optimizer, e, device=device, writer=writer, log_interval=10)    
+        # Evaluate on dev set
+        f1, precision, recall = evaluate(subject_model, object_model, test_loader, id2predicate, e, writer, device=device)
+        # Check whether to save every 5 epochs
+        if e % 5 == 0 and f1 > best_f1:
+            best_f1 = f1
             # save model
-            torch.save(subject_model.state_dict(), f"{args.model_dir}/subject_{args.logname}_{e}.pt")
-            torch.save(object_model.state_dict(), f"{args.model_dir}/object_{args.logname}_{e}.pt")      
-        # evaluate on test set
-        evaluate(subject_model, object_model, test_loader, id2predicate, e, writer, device=device)
-
+            torch.save(subject_model.state_dict(), f"{args.model_dir}/subject.pt")
+            torch.save(object_model.state_dict(), f"{args.model_dir}/object.pt")
     

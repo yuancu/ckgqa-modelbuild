@@ -4,6 +4,7 @@ import os
 import pathlib
 import json
 from datetime import datetime
+import shutil
 
 import numpy as np
 import boto3
@@ -205,3 +206,11 @@ if __name__ == "__main__":
             torch.save(subject_model.state_dict(), f"{args.model_dir}/subject.pt")
             torch.save(object_model.state_dict(), f"{args.model_dir}/object.pt")
     
+    # Save resources for inference: id2predicate, requirements.txt and inference.py
+    # this folder will be uploaded together with model
+    pathlib.Path(f"{args.model_dir}/resources").mkdir(parents=True, exist_ok=True)
+    with open(f"{args.model_dir}/resources/id2predicate.json", 'w', encoding='utf-8') as f:
+        json.dump(id2predicate, f, indent=4, ensure_ascii=False)
+    pathlib.Path(f"{args.model_dir}/code").mkdir(parents=True, exist_ok=True)
+    shutil.copy('./requirements.txt', f"{args.model_dir}/code/")
+    shutil.copy('./inference.py', f"{args.model_dir}/code/")

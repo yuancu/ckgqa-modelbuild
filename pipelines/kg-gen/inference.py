@@ -13,6 +13,10 @@ from dataset import DevDataset, dev_collate_fn
 from utils import extract_spoes
 
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
+
 bert_model_name = 'bert-base-chinese'
 max_sent_len = 128
 bert_dict_len = 21127
@@ -27,7 +31,18 @@ def model_fn(model_dir):
     subject_path = os.path.join(model_dir, 'subject.pt')
     object_path = os.path.join(model_dir, 'object.pt')
     id2predicate_path = os.path.join(model_dir, 'resources', 'id2predicate.json')
-    id2predicate = json.load(open(id2predicate_path))
+    if os.path.isfile(subject_path):
+        logger.info(f"Model locates at: {model_dir}")
+    else:
+        logger.error(f"Can't find model at {model_dir}")
+        logger.error(f"files under {model_dir}: {os.listdir(model_dir)}")
+        logger.error(f"files in up folder: {os.listdir(os.path.join(model_dir, '..'))}")
+    if os.path.isfile(id2predicate_path):
+        logger.info(f"id2predicate locates at: {id2predicate_path}")
+        id2predicate = json.load(open(id2predicate_path))
+    else:
+        logger.error(f"Can't find id2predicates at {id2predicate_path}")
+        id2predicate = json.load(open('./model/resources/id2predicate.jso'))
     subject_model = SubjectModel(bert_dict_len, word_emb).to(device)
     object_model = ObjectModel(word_emb, len(id2predicate)).to(device)
     subject_model.load_state_dict(torch.load(subject_path, map_location=device))
@@ -48,6 +63,7 @@ def predict_fn(input_data, model):
     Returns:
     rel_df (pd.Dataframe): a panda data frame that saves (subject, predicate, object) pairs
     '''
+    
     subject_model, object_model, id2predicate = model
     subject_model.eval()
     object_model.eval()
@@ -78,14 +94,19 @@ def predict_fn(input_data, model):
 ### SAGEMKAER MODEL INPUT FUNCTION
 ###################################
 
-def input_fn(serialized_input_data, content_type="application/jsonlines"):
-    return serialized_input_data
+def input_fn(serialized_input_data, content_type="application/json"):
+    input_data = json.loads(serialized_input_data)
+    logger.info(f"input type: {type(input_data)}")
+    logger.info(f"input data length: {len(input_data)}")
+    if len(input_data) > 1:
+        logger.info(f"first piece of data: {input_data[0]}")
+    return input_data
 
 
 ###################################
 ### SAGEMKAER MODEL OUTPUT FUNCTION
 ###################################
 
-def output_fn(prediction_output, accept="application/jsonlines"):
-    return prediction_output.to_json(), accept
+def output_fn(prediction_output, accept="application/json"):
+    return prediction_output.to_json(force_ascii=False), accept
 

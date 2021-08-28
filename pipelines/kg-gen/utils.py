@@ -4,7 +4,6 @@ import numpy as np
 import time
 
 from tqdm import tqdm
-import boto3
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 bad_tokens = ['，', ',', '》', '《', '"', '：', '  ', '…', '、']
@@ -155,6 +154,7 @@ def seq_max_pool(x):
 
 # helper functions to upload data to s3
 def write_to_s3(filename, bucket, prefix):
+    import boto3
     # put one file in a separate folder. This is helpful if you read and prepare data with Athena
     filename_key = filename.split("/")[-1]
     key = os.path.join(prefix, filename_key)

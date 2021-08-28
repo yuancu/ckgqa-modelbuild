@@ -8,12 +8,26 @@ import json
 import boto3
 from tqdm import tqdm
 
-from utils import upload_to_s3
-
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
+
+
+# helper functions to upload data to s3
+def write_to_s3(filename, bucket, prefix):
+    import boto3
+    # put one file in a separate folder. This is helpful if you read and prepare data with Athena
+    filename_key = filename.split("/")[-1]
+    key = os.path.join(prefix, filename_key)
+    s3 = boto3.resource('s3')
+    return s3.Bucket(bucket).upload_file(filename, key)
+
+
+def upload_to_s3(bucket, prefix, filename):
+    url = "s3://{}/".format(bucket, os.path.join(prefix, filename.split('/')[-1]))
+    print("Writing to {}".format(url))
+    write_to_s3(filename, bucket, prefix)
 
 
 def trans(raw, processed):
@@ -79,14 +93,27 @@ if __name__ == "__main__":
     base_dir = "/opt/ml/processing/ie"
     pathlib.Path(f"{base_dir}/data").mkdir(parents=True, exist_ok=True)
     input_data = args.input_data
-    bucket = input_data.split("/")[2]
-    key = "/".join(input_data.split("/")[3:])
+    if input_data.startswith('s3://'):
+        bucket = input_data.split("/")[2]
+        key = "/".join(input_data.split("/")[3:])
+        logger.info("Downloading data from bucket: %s, key: %s", bucket, key)
+        fn = f"{base_dir}/data/duie.zip"
+        s3 = boto3.resource("s3")
+        s3.Bucket(bucket).download_file(key, fn)
+    else:
+        # it should be a local file
+        if os.path.isfile(args.input_data):
+            logger.info(f"Raw data locates at {args.input_data}")
+            fn = args.input_data
+        elif os.path.isdir(args.input_data):
+            logger.error(f"{args.input_data} should be the file location.\n trying to load {args.input_data}/DuIE_2_0.zip")
+            logger.info(f"files under {args.input_data}: {os.listdir(args.input_data)}")
+            fn =  f"{args.input_data}/DuIE_2_0.zip"
+        else:
+            logger.error(f"{args.input_data} doesn't exist")
+            logger.info(f"files in parent folder {args.input_data+'/..'}: {os.listdir(args.input_data+'/..')}")
+            fn = args.input_data
 
-    logger.info("Downloading data from bucket: %s, key: %s", bucket, key)
-    fn = f"{base_dir}/data/duie.zip"
-    s3 = boto3.resource("s3")
-    s3.Bucket(bucket).download_file(key, fn)
-    
     logger.info("Unzipping dowloaded data...")
     raw = f"{base_dir}/data/raw"
     pathlib.Path(raw).mkdir(parents=True, exist_ok=True)

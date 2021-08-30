@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from model import SubjectModel, ObjectModel
 from dataset import TrainDataset, DevDataset, train_collate_fn, dev_collate_fn
-from utils import para_eval
+from utils import evaluate
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -38,13 +38,13 @@ def parse_args():
     parser.add_argument('--output-data-dir', type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
     parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument('--train', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
-    parser.add_argument('--test', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
+    parser.add_argument('--val', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
     parser.add_argument('--schema', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
     
 #     parser.add_argument('--output-data-dir', type=str)
 #     parser.add_argument('--model-dir', type=str)
 #     parser.add_argument('--train', type=str)
-#     parser.add_argument('--test', type=str)
+#     parser.add_argument('--val', type=str)
 #     parser.add_argument('--schema', type=str)
     
     # Model-specific parameters
@@ -73,18 +73,18 @@ def get_train_loader(args):
     return train_loader
 
 
-def get_test_loader(args):
-    test_data = json.load(open(f"{args.test}/dev.json"))
-    test_dataset = DevDataset(test_data, args.bert_model_name, args.max_sent_len)
-    test_loader = DataLoader(
-        dataset=test_dataset,      # torch TensorDataset format
+def get_val_loader(args):
+    val_data = json.load(open(f"{args.val}/val.json"))
+    val_dataset = DevDataset(val_data, args.bert_model_name, args.max_sent_len)
+    val_loader = DataLoader(
+        dataset=val_dataset,      # torch TensorDataset format
         batch_size=args.batch_size,      # mini batch size
         shuffle=True,               # random shuffle for training
         num_workers=1,
         collate_fn=dev_collate_fn,      # subprocesses for loading data
         multiprocessing_context='spawn',
     )
-    return test_loader
+    return val_loader
 
 
 def get_model(args):
@@ -148,24 +148,12 @@ def train(subject_model, object_model, train_loader, optimizer, epoch, device=to
                     writer.add_scalar('train/loss_object', object_loss.item(), step + epoch * len(train_loader))
                     writer.add_scalar('train/recall_subject', correct_subject/exists_subject, step + epoch * len(train_loader))
                     writer.add_scalar('train/recall_object', correct_object/exists_object, step + epoch * len(train_loader))
-
-
-def evaluate(subject_model, object_model, loader, id2predicate, epoch, writer=None, device=torch.device('cpu')):
-    subject_model.eval()
-    object_model.eval()
-    f1, precision, recall = para_eval(subject_model, object_model, loader, id2predicate, device=device, epoch=epoch, writer=writer)
-    print(f"Eval epoch {epoch}: f1: {f1}, precision: {precision}, recall: {recall}")
-    if writer:
-        writer.add_scalar('eval/f1', f1, epoch)
-        writer.add_scalar('eval/precision', precision, epoch)
-        writer.add_scalar('eval/recall', recall, epoch)
-    return f1, precision, recall
                     
 
 if __name__ == "__main__":
     '''
     invoke:
-    python train.py --output-data-dir ./output --model-dir ./output  --train /opt/ml/processing/ie/data/processed --test /opt/ml/processing/ie/data/processed --schema /opt/ml/processing/ie/data/processed
+    python train.py --output-data-dir ./output --model-dir ./output  --train /opt/ml/processing/ie/data/processed --val /opt/ml/processing/ie/data/processed --schema /opt/ml/processing/ie/data/processed
     '''
 
     args, _ = parse_args()
@@ -174,9 +162,9 @@ if __name__ == "__main__":
     writer = get_tb_writer(args)
 
     logger.info('Training data location: {}'.format(args.train))
-    logger.info('Test data location: {}'.format(args.test))
+    logger.info('Validation data location: {}'.format(args.val))
     train_loader = get_train_loader(args)
-    test_loader = get_test_loader(args)
+    val_loader = get_val_loader(args)
 
     batch_size = args.batch_size
     epochs = args.epochs
@@ -198,7 +186,7 @@ if __name__ == "__main__":
     for e in range(args.epochs):
         train(subject_model, object_model, train_loader, optimizer, e, device=device, writer=writer, log_interval=10)    
         # Evaluate on dev set
-        f1, precision, recall = evaluate(subject_model, object_model, test_loader, id2predicate, e, writer, device=device)
+        f1, precision, recall = evaluate(subject_model, object_model, val_loader, id2predicate, e, writer, device=device)
         # Check whether to save every 5 epochs
         if e % 5 == 0 and f1 > best_f1:
             best_f1 = f1

@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import time
 
+import torch
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,7 +51,7 @@ def sequence_padding(inputs, length=None, value=0, seq_dims=1, mode='post'):
     return np.array(outputs)
 
 
-def extract_spoes(texts, token_ids, offset_mappings, subject_model, object_model, id2predicate, attention_mask=None, writer=None, global_step=None):
+def extract_spoes(texts, token_ids, offset_mappings, subject_model, object_model, id2predicate, attention_mask=None, writer=None, global_step=None):    
     with torch.no_grad():
         subject_preds, hidden_states = subject_model(token_ids) #(batch_size, sent_len, 2)
         # magic numbers come from https://github.com/bojone/bert4keras/blob/master/examples/task_relation_extraction.py
@@ -166,3 +167,15 @@ def upload_to_s3(bucket, prefix, filename):
     url = "s3://{}/".format(bucket, os.path.join(prefix, filename.split('/')[-1]))
     print("Writing to {}".format(url))
     write_to_s3(filename, bucket, prefix)
+
+
+def evaluate(subject_model, object_model, loader, id2predicate, epoch, writer=None, device=torch.device('cpu')):
+    subject_model.eval()
+    object_model.eval()
+    f1, precision, recall = para_eval(subject_model, object_model, loader, id2predicate, device=device, epoch=epoch, writer=writer)
+    print(f"Eval epoch {epoch}: f1: {f1}, precision: {precision}, recall: {recall}")
+    if writer:
+        writer.add_scalar('eval/f1', f1, epoch)
+        writer.add_scalar('eval/precision', precision, epoch)
+        writer.add_scalar('eval/recall', recall, epoch)
+    return f1, precision, recall

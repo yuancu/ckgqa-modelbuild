@@ -7,6 +7,7 @@ import json
 
 import boto3
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 
 logger = logging.getLogger()
@@ -25,12 +26,12 @@ def write_to_s3(filename, bucket, prefix):
 
 
 def upload_to_s3(bucket, prefix, filename):
-    url = "s3://{}/".format(bucket, os.path.join(prefix, filename.split('/')[-1]))
+    url = "s3://{}/{}".format(bucket, os.path.join(prefix, filename.split('/')[-1]))
     print("Writing to {}".format(url))
     write_to_s3(filename, bucket, prefix)
 
 
-def trans(raw, processed):
+def trans(raw, processed, val_split):
     # Read raw schema
     schemas = set()
     with open(f"{raw}/schema.json") as f:
@@ -48,35 +49,42 @@ def trans(raw, processed):
         json.dump([id2predicate, predicate2id], f, indent=4, ensure_ascii=False)
 
     logger.info("Processing raw train data...")
-    train_data = []
+    raw_data = []
     with open(f"{raw}/train.json") as f:
         for l in tqdm(f):
             a = json.loads(l)
-            train_data.append(
+            raw_data.append(
                 {
                     'text': a['text'],
                     'spo_list': [(i['subject'], i['predicate'], i['object']['@value']) for i in a['spo_list']]
                 }
             )
-    
+    # Split train and dev
+    train_data, val_data = train_test_split(raw_data, test_size=val_split)
     logger.info(f"Dumping processed train data into {processed}/train.json")
     with open(f"{processed}/train.json", 'w', encoding='utf-8') as f:
         json.dump(train_data, f, indent=4, ensure_ascii=False)
-
-    logger.info("Processing raw dev data...")
-    dev_data = []
-    with open(f"{raw}/dev.json") as f:
+    with open(f"{processed}/val.json", 'w', encoding='utf-8') as f:
+        json.dump(val_data, f, indent=4, ensure_ascii=False)
+    logger.info("Processing raw test data...")
+    test_data = []
+    with open(f"{raw}/dev.json") as f: # test data are in dev.json
         for l in tqdm(f):
             a = json.loads(l)
-            dev_data.append(
+            test_data.append(
                 {
                     'text': a['text'],
                     'spo_list': [(i['subject'], i['predicate'], i['object']['@value']) for i in a['spo_list']]
                 }
             )
-    logger.info(f"Dumping processed dev data into {processed}/dev.json")
-    with open(f"{processed}/dev.json", 'w', encoding='utf-8') as f:
-        json.dump(dev_data, f, indent=4, ensure_ascii=False)
+    logger.info(f"Dumping processed test data into {processed}/test.json")
+    with open(f"{processed}/test.json", 'w', encoding='utf-8') as f:
+        json.dump(test_data, f, indent=4, ensure_ascii=False)
+        
+    logger.info(f"train data:\t {len(train_data)} pieces")
+    logger.info(f"val data:\t {len(val_data)} pieces")
+    logger.info(f"test data:\t {len(test_data)} pieces")
+
 
 
 if __name__ == "__main__":
@@ -88,6 +96,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-data", type=str, required=True)
     parser.add_argument("--output-dir", type=str, required=False)
+    parser.add_argument("--validation-split", type=float, default=0.05)
     args = parser.parse_args()
 
     base_dir = "/opt/ml/processing/ie"
@@ -124,7 +133,7 @@ if __name__ == "__main__":
     pathlib.Path(processed).mkdir(parents=True, exist_ok=True)
     
     # Transform raw data
-    trans(raw, processed)
+    trans(raw, processed, args.validation_split)
     # Delete downloaded and raw data
     os.unlink(fn)
     os.unlink(f"{raw}/schema.json")
@@ -136,5 +145,6 @@ if __name__ == "__main__":
         bucket = args.output_dir.split("/")[2]
         prefix = "/".join(args.output_dir.split("/")[3:])
         upload_to_s3(bucket, prefix, f"{processed}/train.json")
-        upload_to_s3(bucket, prefix, f"{processed}/dev.json")
+        upload_to_s3(bucket, prefix, f"{processed}/val.json")
+        upload_to_s3(bucket, prefix, f"{processed}/test.json")
         upload_to_s3(bucket, prefix, f"{processed}/schema.json")

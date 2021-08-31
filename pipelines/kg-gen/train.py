@@ -175,6 +175,10 @@ if __name__ == "__main__":
     subject_model, object_model = get_model(args)
     subject_model = subject_model.to(device)
     object_model = object_model.to(device)
+    if torch.cuda.device_count() > 1:
+        logger.info('Using', torch.cuda.device_count(), "GPUs!")
+        subject_model = nn.DataParallel(subject_model)
+        object_model = nn.DataParallel(object_model)
     
     params = subject_model.parameters()
     params = list(params) + list(object_model.parameters())

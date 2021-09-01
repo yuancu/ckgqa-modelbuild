@@ -198,7 +198,7 @@ def get_step_training(bucket, region, role, params, dependencies):
     rules = [ProfilerRule.sagemaker(rule_configs.ProfilerReport())]
     # Define a Training Step to Train a Model
     estimator = PyTorch(entry_point=os.path.join(BASE_DIR, 'train.py'),
-        source_dir='./',
+        source_dir=BASE_DIR,
         role=role,
         instance_type=train_instance_type, # ml.c5.4xlarge, ml.g4dn.4xlarge
         instance_count=train_instance_count,
@@ -315,7 +315,7 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
         sagemaker_session=sess,
         role=role,
-        source_dir='./'
+        source_dir=BASE_DIR
     )
     create_inputs = CreateModelInput(
         instance_type="ml.c5.4xlarge",

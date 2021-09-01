@@ -152,7 +152,7 @@ def get_step_processing(bucket, region, role, params):
     ]
     processing_step = ProcessingStep(
         name="Processing",
-        code="preprocess.py",
+        code=os.path.join(BASE_DIR, "preprocess.py"),
         processor=processor,
         inputs=processing_inputs,
         outputs=processing_outputs,
@@ -197,7 +197,7 @@ def get_step_training(bucket, region, role, params, dependencies):
     )
     rules = [ProfilerRule.sagemaker(rule_configs.ProfilerReport())]
     # Define a Training Step to Train a Model
-    estimator = PyTorch(entry_point='train.py',
+    estimator = PyTorch(entry_point=os.path.join(BASE_DIR, 'train.py'),
         source_dir='./',
         role=role,
         instance_type=train_instance_type, # ml.c5.4xlarge, ml.g4dn.4xlarge
@@ -257,7 +257,7 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
     evaluation_step = ProcessingStep(
         name="EvaluateModel",
         processor=evaluation_processor,
-        code="evaluate.py",
+        code=os.path.join(BASE_DIR, "evaluate.py"),
         inputs=[
             ProcessingInput(
                 input_name='model',
@@ -311,7 +311,7 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
     model = FrameworkModel(
         name=transform_model_name,
         image_uri=inference_image_uri,
-        entry_point = 'inference.py',
+        entry_point=os.path.join(BASE_DIR, "inference.py"),
         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
         sagemaker_session=sess,
         role=role,
@@ -453,17 +453,17 @@ def get_pipeline(
     # train parameters
     train_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.16xlarge")
     train_instance_count = ParameterInteger(name="TrainInstanceCount", default_value=1)
-    epochs = ParameterInteger(name="Epochs", default_value=20)
-    learning_rate = ParameterFloat(name="LearningRate", default_value=0.005)
-    batch_size = ParameterInteger(name="BatchSize", default_value=64)
+    epochs = ParameterString(name="Epochs", default_value='20')
+    learning_rate = ParameterString(name="LearningRate", default_value='0.005')
+    batch_size = ParameterString(name="BatchSize", default_value='64')
 
     # evaluate parameters
-    evaluation_instance_count = ParameterInteger(name="ProcessingInstanceCount", default_value=1)
-    evaluation_instance_type = ParameterString(name="ProcessingInstanceType", default_value="ml.c5.2xlarge")
+    evaluation_instance_count = ParameterInteger(name="EvaluationInstanceCount", default_value=1)
+    evaluation_instance_type = ParameterString(name="EvaluationInstanceType", default_value="ml.c5.2xlarge")
 
     # create model parameters
-    transform_model_name = ParameterString(name="ModelName", default_value="kg-gen-model-{}".format(int(time.time())))
-    inference_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.16xlarge")
+    transform_model_name = ParameterString(name="TransformModelName", default_value="transform-model-{}".format(int(time.time())))
+    inference_instance_type = ParameterString(name="InferenceInstanceType", default_value="ml.g4dn.16xlarge")
  
     # batch transform parameters
     transform_instance_type = ParameterString(name="TransformInstanceType", default_value="ml.c5.4xlarge")
@@ -513,7 +513,8 @@ def get_pipeline(
             'evaluation_instance_type': evaluation_instance_type
         },
         dependencies={
-            'step_train': step_train
+            'step_train': step_train,
+            'step_process': step_process
         }
     )
 

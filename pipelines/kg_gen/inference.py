@@ -8,14 +8,28 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+cwd = os.getcwd()
+logger.info(f"Current file path: {dir_path}")
+logger.info(f"files under current file path:")
+for file in os.listdir(dir_path):
+    logger.info(file)
+logger.info(f"Working directory: {cwd}")
+logger.info(f"files under working directory:")
+for file in os.listdir(cwd):
+    logger.info(file)
+
+
 from model import SubjectModel, ObjectModel
 from dataset import DevDataset, dev_collate_fn
 from utils import extract_spoes
 
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())
+
 
 bert_model_name = 'bert-base-chinese'
 max_sent_len = 128
@@ -42,7 +56,7 @@ def model_fn(model_dir):
         id2predicate = json.load(open(id2predicate_path))
     else:
         logger.error(f"Can't find id2predicates at {id2predicate_path}")
-        id2predicate = json.load(open('./model/resources/id2predicate.jso'))
+        id2predicate = json.load(open('./model/resources/id2predicate.json'))
     subject_model = SubjectModel(bert_dict_len, word_emb).to(device)
     object_model = ObjectModel(word_emb, len(id2predicate)).to(device)
     subject_model.load_state_dict(torch.load(subject_path, map_location=device))

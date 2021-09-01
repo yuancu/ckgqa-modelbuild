@@ -6,6 +6,9 @@ phases:
       python: 3.8
     commands:
       - pip install --upgrade --force-reinstall . awscli
+      - echo "current working directory is $(pwd)"
+      - echo "files under current folder are \n$(ls)"
+      - echo "PATH $PATH"
   
   build:
     commands:

@@ -12,6 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
+print('local rel')
 dir_path = os.path.dirname(os.path.realpath(__file__))
 cwd = os.getcwd()
 logger.info(f"Current file path: {dir_path}")
@@ -27,8 +28,6 @@ for file in os.listdir(cwd):
 from model import SubjectModel, ObjectModel
 from dataset import DevDataset, dev_collate_fn
 from utils import extract_spoes
-
-
 
 
 bert_model_name = 'bert-base-chinese'
@@ -61,6 +60,11 @@ def model_fn(model_dir):
     object_model = ObjectModel(word_emb, len(id2predicate)).to(device)
     subject_model.load_state_dict(torch.load(subject_path, map_location=device))
     object_model.load_state_dict(torch.load(object_path, map_location=device))
+    if torch.__version__ == '1.5.1':
+        import torcheia
+        subject_model = subject_model.eval()
+        # attach_eia() is introduced in PyTorch Elastic Inference 1.5.1,
+        object_model = torcheia.jit.attach_eia(object_model, 0)
     return (subject_model, object_model, id2predicate)
 
 

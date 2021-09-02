@@ -64,6 +64,7 @@ from sagemaker.transformer import Transformer
 import pandas as pd
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+print(f'BASE_DIR: {BASE_DIR}')
 
 def get_sagemaker_client(region):
     """
@@ -197,7 +198,8 @@ def get_step_training(bucket, region, role, params, dependencies):
     )
     rules = [ProfilerRule.sagemaker(rule_configs.ProfilerReport())]
     # Define a Training Step to Train a Model
-    estimator = PyTorch(entry_point=os.path.join(BASE_DIR, 'train.py'),
+    estimator = PyTorch(
+        entry_point='train.py', # relative path to unzipped sourcedir, don't specify as a local path
         source_dir=BASE_DIR,
         role=role,
         instance_type=train_instance_type, # ml.c5.4xlarge, ml.g4dn.4xlarge

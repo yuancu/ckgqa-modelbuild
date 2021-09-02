@@ -313,7 +313,7 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
     model = FrameworkModel(
         name=transform_model_name,
         image_uri=inference_image_uri,
-        entry_point=os.path.join(BASE_DIR, "inference.py"),
+        entry_point="inference.py",
         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
         sagemaker_session=sess,
         role=role,

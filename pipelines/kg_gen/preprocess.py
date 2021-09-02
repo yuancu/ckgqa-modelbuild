@@ -14,6 +14,17 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
+dir_path = os.path.dirname(os.path.realpath(__file__))
+cwd = os.getcwd()
+logger.info(f"Current file path: {dir_path}")
+logger.info(f"files under current file path:")
+for file in os.listdir(dir_path):
+    logger.info(file)
+logger.info(f"Working directory: {cwd}")
+logger.info(f"files under working directory:")
+for file in os.listdir(cwd):
+    logger.info(file)
+
 
 # helper functions to upload data to s3
 def write_to_s3(filename, bucket, prefix):
@@ -91,6 +102,8 @@ if __name__ == "__main__":
     '''
     $ python preprocess.py --input-data s3://sm-nlp-data/ie-baseline/raw/DuIE_2_0.zip --output-dir s3://sm-nlp-data/ie-baseline/train/
     '''
+    
+    
     
     logger.debug("Starting preprocessing.")
     parser = argparse.ArgumentParser()

@@ -16,14 +16,9 @@ print('local rel')
 dir_path = os.path.dirname(os.path.realpath(__file__))
 cwd = os.getcwd()
 logger.info(f"Current file path: {dir_path}")
-logger.info(f"files under current file path:")
-for file in os.listdir(dir_path):
-    logger.info(file)
+logger.info(f"files under current file path: {os.listdir(dir_path)}")
 logger.info(f"Working directory: {cwd}")
-logger.info(f"files under working directory:")
-for file in os.listdir(cwd):
-    logger.info(file)
-
+logger.info(f"files under working directory: {os.listdir(cwd)}")
 
 from model import SubjectModel, ObjectModel
 from dataset import DevDataset, dev_collate_fn
@@ -44,6 +39,13 @@ def model_fn(model_dir):
     subject_path = os.path.join(model_dir, 'subject.pt')
     object_path = os.path.join(model_dir, 'object.pt')
     id2predicate_path = os.path.join(model_dir, 'resources', 'id2predicate.json')
+    
+    logger.info(f"model dir is {model_dir}")
+    logger.info(f"files under model dir: {os.listdir(model_dir)}")
+    for file in os.listdir(model_dir):
+        if os.path.isdir(file):
+            logger.info(f"files under {file}: {os.listdir(file)}")
+    
     if os.path.isfile(subject_path):
         logger.info(f"Model locates at: {model_dir}")
     else:

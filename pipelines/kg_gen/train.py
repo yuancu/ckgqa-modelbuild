@@ -208,3 +208,6 @@ if __name__ == "__main__":
     pathlib.Path(f"{args.model_dir}/code").mkdir(parents=True, exist_ok=True)
     shutil.copy('./requirements.txt', f"{args.model_dir}/code/")
     shutil.copy('./inference.py', f"{args.model_dir}/code/")
+    shutil.copy('./model.py', f"{args.model_dir}/code/")
+    shutil.copy('./utils.py', f"{args.model_dir}/code/")
+    shutil.copy('./dataset.py', f"{args.model_dir}/code/")

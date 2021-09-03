@@ -58,6 +58,7 @@ from sagemaker.debugger import DebuggerHookConfig
 from sagemaker.debugger import ProfilerConfig, FrameworkProfile
 from sagemaker.workflow.step_collections import RegisterModel
 from sagemaker.pytorch.estimator import PyTorch
+from sagemaker.pytorch import PyTorchModel
 from sagemaker.model import FrameworkModel
 from sagemaker.transformer import Transformer
 
@@ -302,22 +303,32 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
     '''
     transform_model_name = params['transform_model_name']
     inference_instance_type = params['inference_instance_type']
-    inference_image_uri = sagemaker.image_uris.retrieve(
-        framework="pytorch",
-        region=region,
-        version="1.8.1",
-        py_version="py3",
-        instance_type=inference_instance_type,
-        image_scope='inference'
-    )
-    model = FrameworkModel(
+#     inference_image_uri = sagemaker.image_uris.retrieve(
+#         framework="pytorch",
+#         region=region,
+#         version="1.8.1",
+#         py_version="py3",
+#         instance_type=inference_instance_type,
+#         image_scope='inference'
+#     )
+#     model = FrameworkModel(
+#         name=transform_model_name,
+#         image_uri=inference_image_uri,
+#         entry_point="inference.py",
+#         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
+#         sagemaker_session=sess,
+#         role=role,
+#         source_dir=BASE_DIR
+#     )
+    model = PyTorchModel(
         name=transform_model_name,
-        image_uri=inference_image_uri,
-        entry_point="inference.py",
         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
-        sagemaker_session=sess,
+        framework_version='1.3.1',
+        py_version='py3',
         role=role,
-        source_dir=BASE_DIR
+        entry_point='inference.py',
+        source_dir=BASE_DIR,
+        sagemaker_session=sess
     )
     create_inputs = CreateModelInput(
         instance_type="ml.c5.4xlarge",

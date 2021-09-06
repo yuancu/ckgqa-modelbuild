@@ -175,4 +175,5 @@ if __name__ == '__main__':
         bucket = args.output_dir.split("/")[2]
         prefix = "/".join(args.output_dir.split("/")[3:])
         upload_to_s3(bucket, prefix, 'processed.tar.gz')
+        subprocess.check_call(['aws', 's3', 'cp', processed, args.output_dir])
     

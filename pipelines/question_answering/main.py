@@ -1,35 +1,19 @@
 import argparse
+import os
 
 from trainer import Trainer
 from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
 from data_loader import load_and_cache_examples
 
 
-def main(args):
-    init_logger()
-    set_seed(args)
-    tokenizer = load_tokenizer(args)
-
-    train_dataset = load_and_cache_examples(args, tokenizer, mode="train")
-    dev_dataset = load_and_cache_examples(args, tokenizer, mode="dev")
-    test_dataset = load_and_cache_examples(args, tokenizer, mode="test")
-
-    trainer = Trainer(args, train_dataset, dev_dataset, test_dataset)
-
-    if args.do_train:
-        trainer.train()
-
-    if args.do_eval:
-        trainer.load_model()
-        trainer.evaluate("test")
-
-
-if __name__ == '__main__':
+def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--task", default=None, required=True, type=str, help="The name of the task to train")
-    parser.add_argument("--model_dir", default=None, required=True, type=str, help="Path to save, load model")
-    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir")
+    parser.add_argument("--model_dir", default=os.environ['SM_MODEL_DIR'], type=str, help="Path to save, load model")
+    parser.add_argument("--data_dir", default=os.environ['SM_CHANNEL_TRAIN'], type=str, help="The input data dir")
+#     parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
+#     parser.add_argument("--data_dir", type=str, help="The input data dir")
     parser.add_argument("--intent_label_file", default="intent_label.txt", type=str, help="Intent Label file")
     parser.add_argument("--slot_label_file", default="slot_label.txt", type=str, help="Slot Label file")
 
@@ -53,9 +37,9 @@ if __name__ == '__main__':
     parser.add_argument('--logging_steps', type=int, default=200, help="Log every X updates steps.")
     parser.add_argument('--save_steps', type=int, default=200, help="Save checkpoint every X updates steps.")
 
-    parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
-    parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the test set.")
-    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
+    parser.add_argument("--do_train", type=bool, default=True, help="Whether to run training.")
+    parser.add_argument("--do_eval", type=bool, default=False, help="Whether to run eval on the test set.")
+    parser.add_argument("--no_cuda", type=bool, default=False, help="Avoid using CUDA when available")
 
     parser.add_argument("--ignore_index", default=0, type=int,
                         help='Specifies a target value that is ignored and does not contribute to the input gradient')
@@ -66,7 +50,37 @@ if __name__ == '__main__':
     parser.add_argument("--use_crf", action="store_true", help="Whether to use CRF")
     parser.add_argument("--slot_pad_label", default="PAD", type=str, help="Pad token for slot label pad (to be ignore when calculate loss)")
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
+def main(args):
+    init_logger()
+    set_seed(args)
+    tokenizer = load_tokenizer(args)
+
+    train_dataset = load_and_cache_examples(args, tokenizer, mode="train")
+    dev_dataset = load_and_cache_examples(args, tokenizer, mode="dev")
+    test_dataset = load_and_cache_examples(args, tokenizer, mode="test")
+
+    trainer = Trainer(args, train_dataset, dev_dataset, test_dataset)
+
+    if args.do_train:
+        trainer.train()
+
+    if args.do_eval:
+        trainer.load_model()
+        trainer.evaluate("test")
+
+
+if __name__ == '__main__':
+    args = parse_args()
     args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
+    print(f"Files under data dir {args.data_dir}: {os.listdir(args.data_dir)}")
+    if len(os.listdir(args.data_dir))==1 and os.listdir(args.data_dir)[0].endswith('.tar.gz'):
+        fn = os.path.join(args.data_dir, os.listdir(args.data_dir)[0])
+        print(f"Unzipping {fn} into {args.data_dir}:")
+        os.system(f"tar -zxvf {fn} -C {args.data_dir}")
+        os.system(f"mv {os.path.join(args.data_dir, 'processed')}/* {args.data_dir}/")
+        os.system(f"rmdir {os.path.join(args.data_dir, 'processed')}")
+        os.system(f"rm {fn}")
+    print(f"Files under data dir {args.data_dir}: {os.listdir(args.data_dir)}")
     main(args)

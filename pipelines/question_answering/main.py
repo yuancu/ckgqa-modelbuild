@@ -1,24 +1,41 @@
-import argparse
 import os
+import sys
+import argparse
+import logging
+import shutil
+import pathlib
+import json
+import tarfile
+import subprocess
+    
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
-from trainer import Trainer
-from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
-from data_loader import load_and_cache_examples
-
+try:
+    from trainer import Trainer
+    from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
+    from data_loader import load_and_cache_examples 
+except:
+    logger.info("trainer, utils and data_loader modules are not available yet")
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--task", default=None, required=True, type=str, help="The name of the task to train")
-    parser.add_argument("--model_dir", default=os.environ['SM_MODEL_DIR'], type=str, help="Path to save, load model")
-    parser.add_argument("--data_dir", default=os.environ['SM_CHANNEL_TRAIN'], type=str, help="The input data dir")
-#     parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
-#     parser.add_argument("--data_dir", type=str, help="The input data dir")
+    try:
+        parser.add_argument("--data_dir", default=os.environ['SM_CHANNEL_TRAIN'], type=str, help="The input data dir")
+        parser.add_argument('--output_data_dir', default=os.environ['SM_OUTPUT_DATA_DIR'], type=str, help="The output data dir")
+        parser.add_argument("--model_dir", default=os.environ['SM_MODEL_DIR'], type=str, help="Path to save, load model")
+    except:
+        logger.info('System env SM_CHANNEL_TRAIN and SM_OUTPUT_DATA_DIR does not exist')
+        parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
+        parser.add_argument("--data_dir", required=True, type=str, help="The input data dir")
+        parser.add_argument('--output_data_dir', type=str, help="The output data dir")
     parser.add_argument("--intent_label_file", default="intent_label.txt", type=str, help="Intent Label file")
     parser.add_argument("--slot_label_file", default="slot_label.txt", type=str, help="Slot Label file")
 
-    parser.add_argument("--model_type", default="bert", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
-
+    parser.add_argument("--model_type", default="bert", type=str, help="Model type selected in the list: " + ", ".join(['bert', 'distilbert', 'albert']))
     parser.add_argument('--seed', type=int, default=1234, help="random seed for initialization")
     parser.add_argument("--train_batch_size", default=32, type=int, help="Batch size for training.")
     parser.add_argument("--eval_batch_size", default=64, type=int, help="Batch size for evaluation.")
@@ -37,8 +54,8 @@ def parse_args():
     parser.add_argument('--logging_steps', type=int, default=200, help="Log every X updates steps.")
     parser.add_argument('--save_steps', type=int, default=200, help="Save checkpoint every X updates steps.")
 
-    parser.add_argument("--do_train", type=bool, default=True, help="Whether to run training.")
-    parser.add_argument("--do_eval", type=bool, default=False, help="Whether to run eval on the test set.")
+    parser.add_argument("--do_train", type=str, default='True', choices=['True', 'False'], help="Whether to run training.")
+    parser.add_argument("--do_eval", type=str, default='False', choices=['True', 'False'], help="Whether to run eval on the test set.")
     parser.add_argument("--no_cuda", type=bool, default=False, help="Avoid using CUDA when available")
 
     parser.add_argument("--ignore_index", default=0, type=int,
@@ -52,7 +69,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def main(args):
+def main(args):    
     init_logger()
     set_seed(args)
     tokenizer = load_tokenizer(args)
@@ -63,17 +80,57 @@ def main(args):
 
     trainer = Trainer(args, train_dataset, dev_dataset, test_dataset)
 
-    if args.do_train:
+    if args.do_train == 'True':
         trainer.train()
+        # Push inference code to model dir
+        shutil.copytree('./model/', f"{args.model_dir}/code/model/") # copytree will create folder code, but raise an error if it exists
+        shutil.copy('./requirements.txt', f"{args.model_dir}/code/")
+        shutil.copy('./data_loader.py', f"{args.model_dir}/code/")
+        shutil.copy('./main.py', f"{args.model_dir}/code/")
+        shutil.copy('./predict.py', f"{args.model_dir}/code/")
+        shutil.copy('./trainer.py', f"{args.model_dir}/code/")
+        shutil.copy('./utils.py', f"{args.model_dir}/code/")
 
-    if args.do_eval:
+    if args.do_eval == 'True':
         trainer.load_model()
-        trainer.evaluate("test")
+        eval_results = trainer.evaluate("test")
+        out_fn = os.path.join(args.output_data_dir, 'evaluation.json')
+        logger.info(f"Dumping evaluation results to {out_fn}")
+        with open(out_fn, 'w') as f:
+            json.dump(eval_results, f, indent=4, ensure_ascii=False)
+        if os.path.isfile(out_fn):
+            logger.info("Dumping succeed")
+        else:
+            logger.error(f"Failed to save evaluation results at {out_fn}")
 
 
 if __name__ == '__main__':
+    '''
+    Invoke test:
+    python main.py --model_dir outputs --task naive --output_data_dir outputs --do_eval=True --do_train=False --data_dir processed
+    '''
     args = parse_args()
+    if args.do_eval == 'True':
+        # Unzip model file
+        logger.info(f"Files under model dir {args.model_dir}: {os.listdir(args.model_dir)}")
+        if len(os.listdir(args.model_dir))>0 and os.listdir(args.model_dir)[0]=='model.tar.gz':
+            model_tar_path = "{}/model.tar.gz".format(args.model_dir)
+            model_tar = tarfile.open(model_tar_path)
+            model_tar.extractall(args.model_dir)
+            model_tar.close()
+        logger.info(f"Model dir {args.model_dir} after extraction: {os.listdir(args.model_dir)}")
+        if 'code' in os.listdir(args.model_dir):
+            code_dir = os.path.join(args.model_dir, 'code')
+            logger.info(f"Files under code dir {code_dir}: {os.listdir(code_dir)}")
+            sys.path.insert(1, code_dir)
+            if 'requirements.txt' in os.listdir(code_dir):
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", f"{code_dir}/requirements.txt"])
+            from trainer import Trainer
+            from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
+            from data_loader import load_and_cache_examples            
+
     args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
+    
     print(f"Files under data dir {args.data_dir}: {os.listdir(args.data_dir)}")
     if len(os.listdir(args.data_dir))==1 and os.listdir(args.data_dir)[0].endswith('.tar.gz'):
         fn = os.path.join(args.data_dir, os.listdir(args.data_dir)[0])

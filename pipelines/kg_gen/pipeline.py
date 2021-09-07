@@ -331,7 +331,7 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
         sagemaker_session=sess
     )
     create_inputs = CreateModelInput(
-        instance_type="ml.c5.4xlarge",
+        instance_type=inference_instance_type,
         accelerator_type="ml.eia1.medium",
     )
     step_create_model = CreateModelStep(

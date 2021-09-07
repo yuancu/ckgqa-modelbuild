@@ -1,4 +1,4 @@
-"""Feature engineers the DuIE dataset."""
+"""Feature engineers the questions."""
 import argparse
 import logging
 import os
@@ -123,9 +123,8 @@ def process(raw, processed, val_split, test_split):
         with open(os.path.join(processed, item, 'label'), 'w') as f:
             for intent in data_dict[item][2]:
                 f.write("%s\n" % intent)
-    # copy schema as they are
-    pathlib.Path(os.path.join(processed, 'schema')).mkdir(parents=True, exist_ok=True)
-    shutil.copytree(os.path.join(raw, 'schema')+'/', os.path.join(processed, 'schema')+'/', dirs_exist_ok=True)
+    # dirs_exist_ok=True is valid from 3.8
+    shutil.copytree(os.path.join(raw, 'schema')+'/', os.path.join(processed, 'schema')+'/')
     
 
 if __name__ == '__main__':

@@ -126,22 +126,7 @@ def convert_input_file_to_tensor_dataset(lines,
     return dataset
 
 
-def predict(pred_config):
-    # load model and args
-    args = get_args(pred_config)
-    device = get_device(pred_config)
-    model = load_model(pred_config, args, device)
-    logger.info(args)
-
-    intent_label_lst = get_intent_labels(args)
-    slot_label_lst = get_slot_labels(args)
-
-    # Convert input file to TensorDataset
-    pad_token_label_id = args.ignore_index
-    tokenizer = load_tokenizer(args)
-    lines = read_input_file(pred_config)
-    dataset = convert_input_file_to_tensor_dataset(lines, pred_config, args, tokenizer, pad_token_label_id)
-
+def predict_helper(model, dataset, pred_config, args, device, slot_label_lst, pad_token_label_id):
     # Predict
     sampler = SequentialSampler(dataset)
     data_loader = DataLoader(dataset, sampler=sampler, batch_size=pred_config.batch_size)
@@ -195,7 +180,28 @@ def predict(pred_config):
         for j in range(slot_preds.shape[1]):
             if all_slot_label_mask[i, j] != pad_token_label_id:
                 slot_preds_list[i].append(slot_label_map[slot_preds[i][j]])
+    
+    return slot_preds_list, intent_preds
 
+
+def predict(pred_config):
+    # load model and args
+    args = get_args(pred_config)
+    device = get_device(pred_config)
+    model = load_model(pred_config, args, device)
+    logger.info(args)
+
+    intent_label_lst = get_intent_labels(args)
+    slot_label_lst = get_slot_labels(args)
+
+    # Convert input file to TensorDataset
+    pad_token_label_id = args.ignore_index
+    tokenizer = load_tokenizer(args)
+    lines = read_input_file(pred_config)
+    dataset = convert_input_file_to_tensor_dataset(lines, pred_config, args, tokenizer, pad_token_label_id)
+
+    slot_preds_list, intent_preds = predict_helper(model, dataset, pred_config, args, device, slot_label_lst, pad_token_label_id)
+    
     # Write to output file
     with open(pred_config.output_file, "w", encoding="utf-8") as f:
         for words, slot_preds, intent_pred in zip(lines, slot_preds_list, intent_preds):
@@ -214,9 +220,9 @@ if __name__ == "__main__":
     init_logger()
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input_file", default="sample_pred_in.txt", type=str, help="Input file for prediction")
-    parser.add_argument("--output_file", default="sample_pred_out.txt", type=str, help="Output file for prediction")
-    parser.add_argument("--model_dir", default="./atis_model", type=str, help="Path to save, load model")
+    parser.add_argument("--input_file", type=str, help="Input file for prediction")
+    parser.add_argument("--output_file", type=str, help="Output file for prediction")
+    parser.add_argument("--model_dir", type=str, help="Path to save, load model")
 
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size for prediction")
     parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")

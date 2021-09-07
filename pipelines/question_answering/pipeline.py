@@ -349,7 +349,7 @@ def get_step_register_model(model_package_group_name, params, dependencies):
     model_metrics = ModelMetrics(
         model_statistics=MetricsSource(
             s3_uri="{}/evaluation.json".format(
-                dependencies['step_evaluation'].arguments["ProcessingOutputConfig"]["Outputs"][0]["S3Output"]["S3Uri"]
+                dependencies['step_evaluate'].arguments["ProcessingOutputConfig"]["Outputs"][0]["S3Output"]["S3Uri"]
             ),
             content_type="application/json",
         )

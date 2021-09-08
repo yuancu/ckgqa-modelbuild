@@ -465,7 +465,7 @@ def get_pipeline(
     processing_instance_type = ParameterString(name="ProcessingInstanceType", default_value="ml.c5.2xlarge")
 
     # train parameters
-    train_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.16xlarge")
+    train_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.16xlarge") 
     train_instance_count = ParameterInteger(name="TrainInstanceCount", default_value=1)
     epochs = ParameterString(name="Epochs", default_value='20')
     learning_rate = ParameterString(name="LearningRate", default_value='0.005')
@@ -477,7 +477,7 @@ def get_pipeline(
 
     # create model parameters
     transform_model_name = ParameterString(name="TransformModelName", default_value="transform-model-{}".format(int(time.time())))
-    inference_instance_type = ParameterString(name="InferenceInstanceType", default_value="ml.g4dn.16xlarge")
+    inference_instance_type = ParameterString(name="InferenceInstanceType", default_value="ml.c5.4xlarge") # ml.c5.4xlarge, ml.g4dn.16xlarge
  
     # batch transform parameters
     transform_instance_type = ParameterString(name="TransformInstanceType", default_value="ml.c5.4xlarge")
@@ -627,7 +627,7 @@ def get_pipeline(
         sagemaker_session=sess,
     )
     print('Pipeline created')
-    import pprint
+    from pprint import pprint
     import json
     definition = json.loads(pipeline.definition())
     pprint(definition)

@@ -433,7 +433,7 @@ def get_pipeline(
     region,
     sagemaker_project_arn=None,
     role=None,
-    default_bucket=None,
+    default_bucket='sm-nlp-data',
     model_package_group_name="KgGenPackageGroup",
     pipeline_name="KnowledgeGraphGenerationPipeline",
     base_job_prefix="ie",
@@ -450,22 +450,21 @@ def get_pipeline(
     """
     print(f"SM role ARN: {sagemaker_project_arn}")
     pipeline_name = pipeline_name + str(int(time.time()))
-    bucket = 'sm-nlp-data'
     sagemaker_session = get_session(region, default_bucket)
     if role is None:
         role = sagemaker.session.get_execution_role(sagemaker_session)
-    sess = get_session(region, bucket)
+    sess = sagemaker_session
         
     # processing parameters
-    raw_input_data_s3_uri = "s3://{}/ie-baseline/raw/DuIE_2_0.zip".format(bucket)
-    processed_data_s3_uri = "s3://{}/ie-baseline/processed/".format(bucket)
+    raw_input_data_s3_uri = "s3://{}/ie-baseline/raw/DuIE_2_0.zip".format(default_bucket)
+    processed_data_s3_uri = "s3://{}/ie-baseline/processed/".format(default_bucket)
     input_data = ParameterString(name="InputData", default_value=raw_input_data_s3_uri)
-    output_dir = ParameterString(name="OutputData", default_value=processed_data_s3_uri,)
+    output_dir = ParameterString(name="ProcessingOutputData", default_value=processed_data_s3_uri,)
     processing_instance_count = ParameterInteger(name="ProcessingInstanceCount", default_value=1)
-    processing_instance_type = ParameterString(name="ProcessingInstanceType", default_value="ml.c5.2xlarge")
+    processing_instance_type = ParameterString(name="ProcessingInstanceType", default_value="ml.c5.2xlarge") #ml.c4.xlarge
 
     # train parameters
-    train_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.16xlarge") 
+    train_instance_type = ParameterString(name="TrainInstanceType", default_value="ml.g4dn.4xlarge") 
     train_instance_count = ParameterInteger(name="TrainInstanceCount", default_value=1)
     epochs = ParameterString(name="Epochs", default_value='20')
     learning_rate = ParameterString(name="LearningRate", default_value='0.005')
@@ -481,7 +480,7 @@ def get_pipeline(
  
     # batch transform parameters
     transform_instance_type = ParameterString(name="TransformInstanceType", default_value="ml.c5.4xlarge")
-    batch_data = ParameterString(name="BatchData", default_value='s3://sm-nlp-data/psudo/psudo.json',)
+    batch_data = ParameterString(name="BatchData", default_value=f's3://{default_bucket}/psudo/psudo.json',)
 
     # register parameters
     model_approval_status = ParameterString(name="ModelApprovalStatus", default_value="PendingManualApproval")
@@ -492,7 +491,7 @@ def get_pipeline(
 
 
     step_process = get_step_processing(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -505,7 +504,7 @@ def get_pipeline(
     print('Step process created!')
     
     step_train = get_step_training(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -522,7 +521,7 @@ def get_pipeline(
     print('Step train created!')
 
     step_evaluate = get_step_evaluation(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -551,7 +550,7 @@ def get_pipeline(
     print('Step register model created!')
 
     step_create_model = get_step_create_model(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         sess=sess,
@@ -566,7 +565,7 @@ def get_pipeline(
     print('Step create model created!')
 
     step_transform = get_step_transform(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -627,8 +626,8 @@ def get_pipeline(
         sagemaker_session=sess,
     )
     print('Pipeline created')
-    from pprint import pprint
-    import json
-    definition = json.loads(pipeline.definition())
-    pprint(definition)
+#     from pprint import pprint
+#     import json
+#     definition = json.loads(pipeline.definition())
+#     pprint(definition)
     return pipeline

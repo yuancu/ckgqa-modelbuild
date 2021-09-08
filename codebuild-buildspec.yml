@@ -9,6 +9,7 @@ phases:
       - echo "Current working directory is $(pwd)"
       - echo "Files under current folder are \n$(ls)"
       - echo "Files under pipelins $(ls -R pipelines)"
+      - export PATH=$PATH:.
       - echo "PATH $PATH"
   
   build:

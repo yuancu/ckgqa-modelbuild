@@ -628,6 +628,7 @@ def get_pipeline(
     )
     print('Pipeline created')
     import pprint
+    import json
     definition = json.loads(pipeline.definition())
     pprint(definition)
     return pipeline

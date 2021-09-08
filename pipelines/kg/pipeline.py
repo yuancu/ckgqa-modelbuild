@@ -500,7 +500,9 @@ def get_pipeline(
             'output_dir': output_dir,
             'processing_instance_count': processing_instance_count,
             'processing_instance_type': processing_instance_type
-        })
+        }
+    )
+    print('Step process created!')
     
     step_train = get_step_training(
         bucket=bucket,
@@ -517,6 +519,7 @@ def get_pipeline(
             'step_process': step_process
         }
     )
+    print('Step train created!')
 
     step_evaluate = get_step_evaluation(
         bucket=bucket,
@@ -531,6 +534,7 @@ def get_pipeline(
             'step_process': step_process
         }
     )
+    print('Step evaluate created!')
 
     step_register_model = get_step_register_model(
         model_package_group_name=model_package_group_name,
@@ -544,6 +548,7 @@ def get_pipeline(
             'step_train': step_train
         }
     )
+    print('Step register model created!')
 
     step_create_model = get_step_create_model(
         bucket=bucket,
@@ -558,6 +563,7 @@ def get_pipeline(
             'step_train': step_train
         }
     )
+    print('Step create model created!')
 
     step_transform = get_step_transform(
         bucket=bucket,
@@ -571,6 +577,7 @@ def get_pipeline(
             'step_create_model': step_create_model
         }
     )
+    print('Step transform created!')
 
     evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
 
@@ -586,6 +593,7 @@ def get_pipeline(
             'step_transform': step_transform
         }
     )
+    print('Step condition created!')
 
     pipeline = Pipeline(
         name=pipeline_name,
@@ -618,4 +626,8 @@ def get_pipeline(
         steps=[step_process, step_train, step_evaluate, step_condition],
         sagemaker_session=sess,
     )
+    print('Pipeline created')
+    import pprint
+    definition = json.loads(pipeline.definition())
+    pprint(definition)
     return pipeline

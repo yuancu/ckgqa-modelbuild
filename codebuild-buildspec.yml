@@ -6,8 +6,9 @@ phases:
       python: 3.8
     commands:
       - pip install --upgrade --force-reinstall . awscli
-      - echo "current working directory is $(pwd)"
-      - echo "files under current folder are \n$(ls)"
+      - echo "Current working directory is $(pwd)"
+      - echo "Files under current folder are \n$(ls)"
+      - echo "Files under pipelins $(ls -R pipelines)"
       - echo "PATH $PATH"
   
   build:

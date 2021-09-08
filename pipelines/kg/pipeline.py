@@ -448,6 +448,7 @@ def get_pipeline(
     Returns:
         an instance of a pipeline
     """
+    print(f"SM role ARN: {sagemaker_project_arn}")
     pipeline_name = pipeline_name + str(int(time.time()))
     bucket = 'sm-nlp-data'
     sagemaker_session = get_session(region, default_bucket)

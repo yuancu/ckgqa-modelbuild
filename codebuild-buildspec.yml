@@ -11,6 +11,7 @@ phases:
       - echo "Files under pipelins $(ls -R pipelines)"
       - export PATH=$PATH:.
       - echo "PATH $PATH"
+      - echo "SageMaker Pipeline Role ARN ${SAGEMAKER_PIPELINE_ROLE_ARN} "
   
   build:
     commands:

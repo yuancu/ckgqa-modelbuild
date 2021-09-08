@@ -409,7 +409,7 @@ def get_pipeline(
     region,
     sagemaker_project_arn=None,
     role=None,
-    default_bucket=None,
+    default_bucket='sm-nlp-data',
     model_package_group_name="QAPackageGroup",
     pipeline_name="QuestionUnderstandingPipeline",
     base_job_prefix="qa",
@@ -425,17 +425,16 @@ def get_pipeline(
         an instance of a pipeline
     """
     pipeline_name = pipeline_name + str(int(time.time()))
-    bucket = 'sm-nlp-data'
     sagemaker_session = get_session(region, default_bucket)
     if role is None:
         role = sagemaker.session.get_execution_role(sagemaker_session)
-    sess = get_session(region, bucket)
+    sess = sagemaker_session
 
-    raw_input_data_s3_uri = "s3://{}/nlu/data/qa_raw.zip".format(bucket)
-    processed_data_s3_uri = "s3://{}/nlu/data/processed/".format(bucket)
+    raw_input_data_s3_uri = "s3://{}/nlu/data/qa_raw.zip".format(default_bucket)
+    processed_data_s3_uri = "s3://{}/nlu/data/processed/".format(default_bucket)
     # preprocessing parameters
     input_data = ParameterString(name="InputData", default_value=raw_input_data_s3_uri)
-    output_dir = ParameterString(name="OutputData", default_value=processed_data_s3_uri)
+    output_dir = ParameterString(name="ProcessingOutputData", default_value=processed_data_s3_uri)
     validation_split = ParameterString(name="ValidationSplit", default_value='0.1')
     test_split = ParameterString(name="TestSplit", default_value='0.1')
     processing_instance_count = ParameterInteger(name="ProcessingInstanceCount", default_value=1)
@@ -466,7 +465,7 @@ def get_pipeline(
     min_slot_f1 = ParameterFloat(name="MinSlotF1", default_value=0.95)
 
     step_process = get_step_processing(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -480,7 +479,7 @@ def get_pipeline(
     )
 
     step_train = get_step_training(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -497,7 +496,7 @@ def get_pipeline(
     )
 
     step_evaluate = get_step_evaluation(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         params={
@@ -523,7 +522,7 @@ def get_pipeline(
     )
 
     step_create_model = get_step_create_model(
-        bucket=bucket,
+        bucket=default_bucket,
         region=region,
         role=role,
         sess=sess,

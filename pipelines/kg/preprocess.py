@@ -103,8 +103,6 @@ if __name__ == "__main__":
     $ python preprocess.py --input-data s3://sm-nlp-data/ie-baseline/raw/DuIE_2_0.zip --output-dir s3://sm-nlp-data/ie-baseline/train/
     '''
     
-    
-    
     logger.debug("Starting preprocessing.")
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-data", type=str, required=True)

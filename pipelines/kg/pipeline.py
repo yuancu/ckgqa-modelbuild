@@ -120,12 +120,12 @@ def get_pipeline_custom_tags(new_tags, region, sagemaker_project_arn=None):
 def get_step_processing(bucket, region, role, params):
     '''
     params: 
-        input_data
+        raw_input_dataset
         output_dir
         processing_instance_count
         processing_instance_type
     '''
-    input_data = params['input_data']
+    raw_input_dataset = params['raw_input_dataset']
     output_dir = params['output_dir']
     processing_instance_count = params['processing_instance_count']
     processing_instance_type = params['processing_instance_type']
@@ -139,7 +139,7 @@ def get_step_processing(bucket, region, role, params):
     processing_inputs = [
         ProcessingInput(
             input_name="raw",
-            source=input_data,
+            source=raw_input_dataset,
             destination="/opt/ml/processing/ie/data/raw",
             s3_data_distribution_type="ShardedByS3Key",
             )
@@ -347,15 +347,17 @@ def get_step_transform(bucket, region, role, params, dependencies):
     params:
         transform_instance_type
         batch_data
+        transform_output_prefix
     dependencies: 'step_create_model'
     '''
     transform_instance_type = params['transform_instance_type']
     batch_data = params['batch_data']
+    transform_output_prefix = params['transform_output_prefix']
     transformer = Transformer(
         model_name=dependencies['step_create_model'].properties.ModelName,
         instance_type=transform_instance_type,
         instance_count=1,
-        output_path=f"s3://{bucket}/ie-baseline/outputs",
+        output_path=f"s3://{bucket}/{transform_output_prefix}",
     )
     step_transform = TransformStep(
         name="KgTransform", transformer=transformer, inputs=TransformInput(data=batch_data)
@@ -400,6 +402,66 @@ def get_step_register_model(model_package_group_name, params, dependencies):
     return step_register
 
 
+def get_step_bulkload(bucket, region, role, params, dependencies):
+    '''
+    params:
+        bulkload_instance_type
+        neptune_endpoint
+        raw_input_dataset
+    dependencies:
+        step_transform
+    '''
+    bulkload_instance_type = params['bulkload_instance_type']
+    neptune_endpoint = params['neptune_endpoint']
+    raw_input_dataset = params['raw_input_dataset']
+
+    processor = SKLearnProcessor(
+        framework_version="0.23-1",
+        role=role,
+        instance_type=bulkload_instance_type,
+        instance_count=1,
+        env={"AWS_DEFAULT_REGION": region},
+    )
+
+    bulkload_inputs = [
+        ProcessingInput(
+            input_name="TransformedData",
+            source=dependencies['step_transform'].properties.TransformOutput,
+            destination="/opt/ml/processing/ie/data/transformed",
+            s3_data_distribution_type="ShardedByS3Key",
+        ),
+        ProcessingInput(
+            input_name="RawDataset",
+            source=raw_input_dataset,
+            destination="/opt/ml/processing/ie/data/raw/",
+            s3_data_distribution_type="ShardedByS3Key",
+        ),
+    ]
+
+    bulkload_step = ProcessingStep(
+        name="BulkloadStep",
+        code="bulkload.py",
+        processor=processor,
+        inputs=bulkload_inputs,
+        job_arguments=[
+            "--transformed-data",
+            bulkload_inputs[0].destination, # /opt/ml/processing/ie/data/raw
+            "--raw-dataset",
+            bulkload_inputs[1].destination, # DuIE_2_0.zip
+            "--bucket",
+            bucket,
+            "--save-prefix",
+            'ie-baseline/outputs',
+            "--role",
+            role,
+            "--region",
+            region,
+            "--neptune-endpoint",
+            neptune_endpoint
+        ],
+    )
+    return bulkload_step
+
 def get_step_condition(evaluation_report, params, dependencies):
     '''
     params:
@@ -409,6 +471,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         'step_register'
         'step_create_model'
         'step_transform'
+        'step_bulkload'
     '''
     min_f1_value = params['min_f1_value']
     minimum_f1_condition = ConditionGreaterThanOrEqualTo(
@@ -423,7 +486,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         name="F1Condition",
         conditions=[minimum_f1_condition],
         if_steps=[dependencies['step_register'], dependencies['step_create_model'], \
-            dependencies['step_transform']],  # success, continue with model registration
+            dependencies['step_transform'], dependencies['step_bulkload']],  # success, continue with model registration
         else_steps=[],  # fail, end the pipeline
     )
     return minimum_f1_condition_step
@@ -458,7 +521,7 @@ def get_pipeline(
     # processing parameters
     raw_input_data_s3_uri = "s3://{}/ie-baseline/raw/DuIE_2_0.zip".format(default_bucket)
     processed_data_s3_uri = "s3://{}/ie-baseline/processed/".format(default_bucket)
-    input_data = ParameterString(name="InputData", default_value=raw_input_data_s3_uri)
+    raw_input_dataset = ParameterString(name="InputDataset", default_value=raw_input_data_s3_uri)
     output_dir = ParameterString(name="ProcessingOutputData", default_value=processed_data_s3_uri,)
     processing_instance_count = ParameterInteger(name="ProcessingInstanceCount", default_value=1)
     processing_instance_type = ParameterString(name="ProcessingInstanceType", default_value="ml.c5.2xlarge") #ml.c4.xlarge
@@ -481,7 +544,12 @@ def get_pipeline(
     # batch transform parameters
     transform_instance_type = ParameterString(name="TransformInstanceType", default_value="ml.c5.4xlarge")
     batch_data = ParameterString(name="BatchData", default_value=f's3://{default_bucket}/psudo/psudo.json',)
-
+    transform_output_prefix = ParameterString(name="TransformOutputPrefix", default_value='ie-baseline/outputs/transformed')
+    
+    # bulkload parameters
+    bulkload_instance_type = ParameterString(name="BulkloadInstanceType", default_value="ml.m4.xlarge")
+    neptune_endpoint = ParameterString(name="NeptuneEndpoint", default_value='http://alb-neptune-test-62758122.us-east-1.elb.amazonaws.com')
+    
     # register parameters
     model_approval_status = ParameterString(name="ModelApprovalStatus", default_value="PendingManualApproval")
     deploy_instance_type = ParameterString(name="DeployInstanceType", default_value="ml.m4.xlarge")
@@ -495,7 +563,7 @@ def get_pipeline(
         region=region,
         role=role,
         params={
-            'input_data': input_data,
+            'raw_input_dataset': raw_input_dataset,
             'output_dir': output_dir,
             'processing_instance_count': processing_instance_count,
             'processing_instance_type': processing_instance_type
@@ -570,13 +638,28 @@ def get_pipeline(
         role=role,
         params={
             'transform_instance_type': transform_instance_type,
-            'batch_data': batch_data
+            'batch_data': batch_data,
+            'transform_output_prefix': transform_output_prefix
         },
         dependencies={
             'step_create_model': step_create_model
         }
     )
     print('Step transform created!')
+
+    step_bulkload = get_step_bulkload(
+        bucket=default_bucket,
+        region=region,
+        role=role,
+        params={
+            'bulkload_instance_type': bulkload_instance_type,
+            'neptune_endpoint': neptune_endpoint,
+            'raw_input_dataset': raw_input_dataset
+        },
+        dependencies={
+            'step_transform': step_transform
+        }
+    )
 
     evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
 
@@ -589,7 +672,8 @@ def get_pipeline(
             'step_evaluate': step_evaluate,
             'step_register': step_register_model,
             'step_create_model': step_create_model,
-            'step_transform': step_transform
+            'step_transform': step_transform,
+            'step_bulkload': step_bulkload
         }
     )
     print('Step condition created!')
@@ -597,7 +681,7 @@ def get_pipeline(
     pipeline = Pipeline(
         name=pipeline_name,
         parameters=[
-            input_data,
+            raw_input_dataset,
             output_dir,
             processing_instance_count,
             processing_instance_type,
@@ -613,6 +697,9 @@ def get_pipeline(
 
             transform_model_name,
             inference_instance_type,
+
+            bulkload_instance_type,
+            neptune_endpoint,
             
             transform_instance_type,
             batch_data,

@@ -115,7 +115,19 @@ if __name__ == '__main__':
     logger.info(f"Data unzipped to {raw}")
 
     schema_path = f"{raw}/schema.json"
-    node_df, edge_df = convert_to_nodes_and_edges(args.transformed_data, schema_path)
+    
+    if os.path.isfile(args.transformed_data):
+        logger.info(f"Transformed data locates at {args.transformed_data}")
+        transformed = args.transformed_data
+    elif os.path.isdir(args.transformed_data):
+        transformed =  os.path.join(args.transformed_data, os.listdir(args.transformed_data)[0])
+        logger.info(f"Files under transformed {os.listdir(args.transformed_data)}")
+        logger.info(f"Taking {transformed} as output from transform step")
+    else:
+        logger.info(f"{args.transformed_data} does not exist")
+        transformed = None
+    
+    node_df, edge_df = convert_to_nodes_and_edges(transformed, schema_path)
 
     pathlib.Path(f"{base_dir}/data/graph").mkdir(parents=True, exist_ok=True)
     local_node_path = f"{base_dir}/data/graph/nodes.csv"

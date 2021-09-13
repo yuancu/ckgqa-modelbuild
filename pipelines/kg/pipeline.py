@@ -426,7 +426,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
     bulkload_inputs = [
         ProcessingInput(
             input_name="TransformedData",
-            source=dependencies['step_transform'].properties.TransformOutput,
+            source=dependencies['step_transform'].transformer.output_path,
             destination="/opt/ml/processing/ie/data/transformed",
             s3_data_distribution_type="ShardedByS3Key",
         ),
@@ -440,7 +440,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
 
     bulkload_step = ProcessingStep(
         name="BulkloadStep",
-        code="bulkload.py",
+        code=os.path.join(BASE_DIR, 'bulkload.py'),
         processor=processor,
         inputs=bulkload_inputs,
         job_arguments=[
@@ -660,6 +660,7 @@ def get_pipeline(
             'step_transform': step_transform
         }
     )
+    print('Step bulkload created!')
 
     evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
 

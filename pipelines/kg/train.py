@@ -1,6 +1,12 @@
+import subprocess
+import os
+import sys
+dir_path = os.path.dirname(os.path.realpath(__file__))
+# subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", f"{dir_path}/requirements.txt"])
+subprocess.check_call([sys.executable, "-m", "pip", "install", "tensorboard<2.4"])
+
 import logging
 import argparse
-import os
 import pathlib
 import json
 from datetime import datetime

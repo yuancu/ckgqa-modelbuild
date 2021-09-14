@@ -439,7 +439,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
     ]
 
     bulkload_step = ProcessingStep(
-        name="BulkloadStep",
+        name="NeptuneBulkload",
         code=os.path.join(BASE_DIR, 'bulkload.py'),
         processor=processor,
         inputs=bulkload_inputs,
@@ -460,6 +460,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
             neptune_endpoint
         ],
     )
+    bulkload_step.add_depends_on([dependencies['step_transform']])
     return bulkload_step
 
 def get_step_condition(evaluation_report, params, dependencies):

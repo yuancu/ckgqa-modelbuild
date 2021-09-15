@@ -239,6 +239,11 @@ def parse_args():
     return parser.parse_known_args()
 
 if __name__ == '__main__':
+    '''
+    python alert.py --alert-topic test --alert-message hellofromsns --alert-phones +8613121277075
+    python alert.py --alert-topic test --alert-message hellofromsns --alert-emails immr.shen@gmail.com,yuanchu@amazon.com
+    '''
+    
     args, _ = parse_args()
     sns_wrapper = SnsWrapper(boto3.resource('sns'))
     topic = sns_wrapper.create_topic(args.alert_topic)
@@ -248,20 +253,31 @@ if __name__ == '__main__':
         phones = args.alert_phones.split(sep=',')
     if args.alert_emails is not None:
         emails = args.alert_emails.split(sep=',')
+        
+    subscribed = sns_wrapper.list_subscriptions(topic)
+    logger.info("Existing subscribers:")
+    for subscriber in subscribed:   
+        logger.info(f"{subscriber.attributes['Protocol']}: {subscriber.attributes['Endpoint']}")
+
+    email_subscribers = [subscriber.attributes['Endpoint'] for subscriber in subscribed if subscriber.attributes['Protocol']=='email']
+    phone_subscribers = [subscriber.attributes['Endpoint'] for subscriber in subscribed if subscriber.attributes['Protocol']=='sms']
     
     for phone in phones:
-        logger.info(f"Sending an SMS message directly from SNS to {phone}.")
-        sns_wrapper.publish_text_message(phone, args.alert_message)
+        # logger.info(f"Sending an SMS message directly from SNS to {phone}.")
+        # sns_wrapper.publish_text_message(phone, args.alert_message)
         # subscribe this topic for future message
-        phone_sub = sns_wrapper.subscribe(topic, 'sms', phone)
+        if phone not in phone_subscribers:
+            logger.info(f"Subscribing {phone} to {args.alert_topic}.")
+            phone_sub = sns_wrapper.subscribe(topic, 'sms', phone)
     
     for email in emails:
-        print(f"Subscribing {email} to {args.alert_topic}.")
-        email_sub = sns_wrapper.subscribe(topic, 'email', email)
-        logger.info(
-            f"Confirmation email sent to {email}. To receive SNS messages, "
-            f"follow the instructions in the email."
-        )
+        if email not in phone_subscribers:
+            logger.info(f"Subscribing {email} to {args.alert_topic}.")
+            email_sub = sns_wrapper.subscribe(topic, 'email', email)
+            logger.info(
+                f"Confirmation email sent to {email}. To receive SNS messages, "
+                f"follow the instructions in the email."
+            )
     
     sns_wrapper.publish_multi_message(
             topic, args.alert_topic,

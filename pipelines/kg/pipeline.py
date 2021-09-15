@@ -3,10 +3,10 @@
 
                                                    . RegisterModel
                                                . -
-                                              .    . CreateModel -> BatchTransform
+                                              .    . CreateModel -> BatchTransform -> NeptuneBulkload
     Process-> Train -> Evaluate -> Condition .
                                               .
-                                               . -(stop)
+                                               . - AlertDevTeam
 
 Implements a get_pipeline(**kwargs) method.
 """
@@ -463,6 +463,45 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
     bulkload_step.add_depends_on([dependencies['step_transform']])
     return bulkload_step
 
+
+def get_step_alert(bucket, region, role, params, dependencies):
+    '''
+    params:
+        alert_emails
+        alert_phones
+    dependencies:
+        step_evaluate
+    '''
+    alert_emails = params['alert_emails']
+    alert_phones = params['alert_phones']
+
+    processor = SKLearnProcessor(
+        framework_version="0.23-1",
+        role=role,
+        instance_type="ml.t3.medium",
+        instance_count=1,
+        env={"AWS_DEFAULT_REGION": region},
+    )
+    
+    # TODO: get metrics from step_evaluate or step_evaluate
+    alert_step = ProcessingStep(
+        name="AlertDevTeam",
+        code=os.path.join(BASE_DIR, 'alert.py'),
+        processor=processor,
+        job_arguments=[
+            "--alert-topic",
+            "DummyTopic",
+            "--alert-message",
+            "DummyContent",
+            "--alert-emails",
+            alert_emails,
+            "--alert_phones",
+            alert_phones
+        ],
+    )
+    return alert_step
+
+
 def get_step_condition(evaluation_report, params, dependencies):
     '''
     params:
@@ -473,6 +512,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         'step_create_model'
         'step_transform'
         'step_bulkload'
+        'step_alert'
     '''
     min_f1_value = params['min_f1_value']
     minimum_f1_condition = ConditionGreaterThanOrEqualTo(
@@ -488,7 +528,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         conditions=[minimum_f1_condition],
         if_steps=[dependencies['step_register'], dependencies['step_create_model'], \
             dependencies['step_transform'], dependencies['step_bulkload']],  # success, continue with model registration
-        else_steps=[],  # fail, end the pipeline
+        else_steps=[dependencies['step_alert']],  # fail, end the pipeline
     )
     return minimum_f1_condition_step
 
@@ -554,6 +594,10 @@ def get_pipeline(
     # register parameters
     model_approval_status = ParameterString(name="ModelApprovalStatus", default_value="PendingManualApproval")
     deploy_instance_type = ParameterString(name="DeployInstanceType", default_value="ml.m4.xlarge")
+    
+    # alert parameters
+    alert_emails = ParameterString(name="AlertEmails", default_value="yuanchu@amazon.com")
+    alert_phones = ParameterString(name="AlertPhones", default_value="+8613121277075")
 
     # condition parameters
     min_f1_value = ParameterFloat(name="MinF1Value", default_value=0.5)
@@ -662,9 +706,22 @@ def get_pipeline(
         }
     )
     print('Step bulkload created!')
+    
+    step_alert = get_step_alert(
+        bucket=default_bucket,
+        region=region,
+        role=role,
+        params={
+            'alert_emails': alert_emails,
+            'alert_phones': alert_phones
+        },
+        dependencies={
+            'step_evaluate': step_evaluate
+        }
+    )
+    print('Step alert created!')
 
     evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
-
     step_condition = get_step_condition(
         evaluation_report=evaluation_report,
         params={
@@ -675,7 +732,8 @@ def get_pipeline(
             'step_register': step_register_model,
             'step_create_model': step_create_model,
             'step_transform': step_transform,
-            'step_bulkload': step_bulkload
+            'step_bulkload': step_bulkload,
+            'step_alert': step_alert
         }
     )
     print('Step condition created!')
@@ -708,6 +766,9 @@ def get_pipeline(
 
             model_approval_status,
             deploy_instance_type,
+            
+            alert_emails,
+            alert_phones,
             
             min_f1_value
         ],

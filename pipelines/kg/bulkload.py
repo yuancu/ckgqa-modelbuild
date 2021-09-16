@@ -143,12 +143,12 @@ if __name__ == '__main__':
 
     load_script = f"""curl -X POST \
     -H 'Content-Type: application/json' \
-    {args.neptune_endpoint}/loader -d "
+    https://{args.neptune_endpoint}:{args.neptune_port}/loader -d "
     {{
       'source' : 's3://{args.bucket}/{args.save_prefix}/',
       'format' : 'csv',
-      'iamRoleArn' : '{args.role}',
-      'region' : '{args.region}',
+      'iamRoleArn' : '{args.loadfroms3_role}',
+      'region' : '{args.neptune_region}',
       'failOnError' : 'FALSE',
       'parallelism' : 'MEDIUM',
       'updateSingleCardinalityProperties' : 'FALSE',

@@ -1,6 +1,11 @@
 '''
 Send notification to administrator via Amazon Simple Notification 
 Service (SNS) when pipeline fails
+
+Required Permissions:
+SNS:CreateTopics
+SNS:Publish
+etc.
 '''
 import argparse
 import json

@@ -25,9 +25,10 @@ def parse_args():
     parser.add_argument('--raw-dataset', type=str, help='local path to raw dataset, this is to load schema')
     parser.add_argument('--bucket', required=False, type=str, help='s3 bucket to save generated files')
     parser.add_argument('--save-prefix', required=False, type=str, help='s3 prefix folder to save generated files')
-    parser.add_argument('--role', type=str, required=False, help='an iam role attached to Neptune to access aws services')
-    parser.add_argument('--region', type=str,required=False, help='region of Neptune database')
-    parser.add_argument('--neptune-endpoint',required=False, type=str, help='https://your-neptune-endpoint:port')
+    parser.add_argument('--loadfroms3-role', type=str, required=False, help='an iam role attached to Neptune to access aws services')
+    parser.add_argument('--neptune-endpoint',required=False, type=str, help='neptune cluster endpoint')
+    parser.add_argument('--neptune-port',required=False, type=int, default=8182, help='neptune port')
+    parser.add_argument('--neptune-region',required=False, type=str, default='us-east-1', help='region of Neptune database') 
     return parser.parse_known_args()
 
 # currently id is constructed naively.

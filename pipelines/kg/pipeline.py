@@ -237,7 +237,7 @@ def get_step_training(bucket, region, role, params, dependencies):
     return training_step
 
 
-def get_step_evaluation(bucket, region, role, params, dependencies):
+def get_step_evaluation(bucket, region, role, params, dependencies, properties):
     '''
     params:
         evaluation_instance_count
@@ -245,9 +245,12 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
     dependencies: 
         'step_train'
         'step_process'
+    properties:
+        evaluation_report
     '''
     evaluation_instance_count = params['evaluation_instance_count']
     evaluation_instance_type = params['evaluation_instance_type']
+    evaluation_report = properties['evaluation_report']
     evaluation_processor = SKLearnProcessor(
         role=role,
         framework_version="0.23-1",
@@ -256,7 +259,6 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
         env={"AWS_DEFAULT_REGION": region},
         max_runtime_in_seconds=7200,
     )
-    evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
     evaluation_step = ProcessingStep(
         name="EvaluateModel",
         processor=evaluation_processor,
@@ -289,7 +291,7 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
             "--source-dir",
             "/opt/ml/processing/input/source/train"
         ],
-        property_files=[evaluation_report],
+        property_files=[evaluation_report]
     )
     return evaluation_step
 
@@ -402,7 +404,64 @@ def get_step_register_model(model_package_group_name, params, dependencies):
     return step_register
 
 
-def get_step_bulkload(bucket, region, role, params, dependencies):
+def get_step_create_db(bucket, region, role, params, dependencies, properties):
+    '''
+    params:
+        db_cluster_identifier
+        db_instance_suffix
+        db_instance_class
+        iam_loadfroms3_role_name
+    dependencies:
+    properties:
+        neptune_metadata
+    '''
+    db_cluster_identifier = params['db_cluster_identifier']
+    db_instance_suffix = params['db_instance_suffix']
+    db_instance_class = params['db_instance_class']
+    iam_loadfroms3_role_name = params['iam_loadfroms3_role_name']
+    neptune_metadata = properties['neptune_metadata']
+
+    processor = SKLearnProcessor(
+        framework_version="0.23-1",
+        role=role,
+        instance_type="ml.t3.medium",
+        instance_count=1,
+        env={"AWS_DEFAULT_REGION": region},
+    )
+    
+    output_neptune_metadata_dir = "/opt/ml/processing/output/"
+    output_name = neptune_metadata.output_name
+    output_neptune_metadata_filename = neptune_metadata.path.split('/')[-1]
+    
+    create_db_step = ProcessingStep(
+        name="RetrieveOrCreateNeptuneDB",
+        code=os.path.join(BASE_DIR, 'createdb.py'),
+        processor=processor,
+        outputs=[
+            ProcessingOutput(
+                output_name=output_name, s3_upload_mode="EndOfJob", source=output_neptune_metadata_dir
+            ),
+        ],
+        job_arguments=[
+            "--db-cluster-identifier",
+            db_cluster_identifier,
+            "--db-instance-suffix",
+            db_instance_suffix,
+            "--db-instance-class",
+            db_instance_class,
+            "--load-from-s3-role-name",
+            iam_loadfroms3_role_name,
+            "--output-neptune-metadata-dir",
+            output_neptune_metadata_dir,
+            "--output-neptune-metadata-filename",
+            output_neptune_metadata_filename
+        ],
+        property_files=[neptune_metadata]
+    )
+    return create_db_step
+
+
+def get_step_bulkload(bucket, region, role, params, dependencies, properties):
     '''
     params:
         bulkload_instance_type
@@ -410,10 +469,35 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
         raw_input_dataset
     dependencies:
         step_transform
+        step_create_db
+    properties:
+        neptune_metadata
     '''
     bulkload_instance_type = params['bulkload_instance_type']
     neptune_endpoint = params['neptune_endpoint']
     raw_input_dataset = params['raw_input_dataset']
+    neptune_metadata = properties['neptune_metadata']
+    
+    db_cluster_endpoint = JsonGet(
+        step=dependencies['step_create_db'],
+        property_file=neptune_metadata,
+        json_path="cluster_endpoint",
+    )
+    db_cluster_port = JsonGet(
+        step=dependencies['step_create_db'],
+        property_file=neptune_metadata,
+        json_path="cluster_port",
+    )
+    db_cluster_region = JsonGet(
+        step=dependencies['step_create_db'],
+        property_file=neptune_metadata,
+        json_path="cluster_region",
+    )
+    iam_role_loadfroms3_arn = JsonGet(
+        step=dependencies['step_create_db'],
+        property_file=neptune_metadata,
+        json_path="role_loadfroms3_arn",
+    )
 
     processor = SKLearnProcessor(
         framework_version="0.23-1",
@@ -452,12 +536,14 @@ def get_step_bulkload(bucket, region, role, params, dependencies):
             bucket,
             "--save-prefix",
             'ie-baseline/outputs',
-            "--role",
-            role,
-            "--region",
-            region,
+            "--loadfroms3-role",
+            iam_role_loadfroms3_arn,
+            "--neptune-region",
+            db_cluster_region,
             "--neptune-endpoint",
-            neptune_endpoint
+            db_cluster_endpoint,
+            "--neptune-port",
+            db_cluster_port
         ],
     )
     bulkload_step.add_depends_on([dependencies['step_transform']])
@@ -502,7 +588,7 @@ def get_step_alert(bucket, region, role, params, dependencies):
     return alert_step
 
 
-def get_step_condition(evaluation_report, params, dependencies):
+def get_step_condition(params, dependencies, properties):
     '''
     params:
         min_f1_value
@@ -513,8 +599,11 @@ def get_step_condition(evaluation_report, params, dependencies):
         'step_transform'
         'step_bulkload'
         'step_alert'
+    properties:
+        evaluation_report
     '''
     min_f1_value = params['min_f1_value']
+    evaluation_report = properties['evaluation_report']
     minimum_f1_condition = ConditionGreaterThanOrEqualTo(
         left=JsonGet(
             step=dependencies['step_evaluate'],
@@ -587,6 +676,12 @@ def get_pipeline(
     batch_data = ParameterString(name="BatchData", default_value=f's3://{default_bucket}/psudo/psudo.json',)
     transform_output_prefix = ParameterString(name="TransformOutputPrefix", default_value='ie-baseline/outputs/transformed')
     
+    # create db step
+    db_cluster_identifier = ParameterString(name="NeptuneClusterIdentifier", default_value="kg-neptune")
+    db_instance_suffix = ParameterString(name="NeptuneInstanceSuffix", default_value="instance-1")
+    db_instance_class = ParameterString(name="NeptuneInstanceClass", default_value="db.t3.medium")
+    iam_loadfroms3_role_name = ParameterString(name="IamLoadFromS3RoleName", default_value="NeptuneLoadFromS3")
+    
     # bulkload parameters
     bulkload_instance_type = ParameterString(name="BulkloadInstanceType", default_value="ml.m4.xlarge")
     neptune_endpoint = ParameterString(name="NeptuneEndpoint", default_value='http://alb-neptune-test-62758122.us-east-1.elb.amazonaws.com')
@@ -601,7 +696,10 @@ def get_pipeline(
 
     # condition parameters
     min_f1_value = ParameterFloat(name="MinF1Value", default_value=0.5)
-
+    
+    # Property files for data dependency. The output_name must be the same with thoes defined in steps.
+    evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
+    neptune_metadata = PropertyFile(name="NeptuneDbMetadata", output_name="neptune_metadata", path="neptune_metadata.json")
 
     step_process = get_step_processing(
         bucket=default_bucket,
@@ -644,6 +742,9 @@ def get_pipeline(
         dependencies={
             'step_train': step_train,
             'step_process': step_process
+        },
+        properties={
+            'evaluation_report': evaluation_report
         }
     )
     print('Step evaluate created!')
@@ -691,6 +792,23 @@ def get_pipeline(
         }
     )
     print('Step transform created!')
+    
+    step_create_db = get_step_create_db(
+        bucket=default_bucket,
+        region=region,
+        role=role,
+        params={
+            'db_cluster_identifier': db_cluster_identifier,
+            'db_instance_suffix': db_instance_suffix,
+            'db_instance_class': db_instance_class,
+            'iam_loadfroms3_role_name': iam_loadfroms3_role_name
+        },
+        dependencies={},
+        properties={
+            'neptune_metadata': neptune_metadata
+        }
+    )
+    print('Step create database created!')
 
     step_bulkload = get_step_bulkload(
         bucket=default_bucket,
@@ -702,7 +820,11 @@ def get_pipeline(
             'raw_input_dataset': raw_input_dataset
         },
         dependencies={
-            'step_transform': step_transform
+            'step_transform': step_transform,
+            'step_create_db': step_create_db
+        },
+        properties={
+            'neptune_metadata': neptune_metadata
         }
     )
     print('Step bulkload created!')
@@ -721,9 +843,7 @@ def get_pipeline(
     )
     print('Step alert created!')
 
-    evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
     step_condition = get_step_condition(
-        evaluation_report=evaluation_report,
         params={
             'min_f1_value': min_f1_value
         },
@@ -732,8 +852,12 @@ def get_pipeline(
             'step_register': step_register_model,
             'step_create_model': step_create_model,
             'step_transform': step_transform,
+            'step_create_db': step_create_db,
             'step_bulkload': step_bulkload,
             'step_alert': step_alert
+        },
+        properties={
+            'evaluation_report': evaluation_report
         }
     )
     print('Step condition created!')
@@ -757,6 +881,11 @@ def get_pipeline(
 
             transform_model_name,
             inference_instance_type,
+            
+            db_cluster_identifier,
+            db_instance_suffix,
+            db_instance_class,
+            iam_loadfroms3_role_name,
 
             bulkload_instance_type,
             neptune_endpoint,

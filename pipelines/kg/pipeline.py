@@ -34,11 +34,10 @@ from sagemaker.processing import (
     ScriptProcessor,
 )
 from sagemaker.sklearn.processing import SKLearnProcessor
-from sagemaker.workflow.conditions import ConditionGreaterThanOrEqualTo, ConditionLessThanOrEqualTo
-from sagemaker.workflow.condition_step import (
-    ConditionStep,
-    JsonGet,
-)
+from sagemaker.workflow.conditions import ConditionGreaterThanOrEqualTo
+from sagemaker.workflow.condition_step import ConditionStep
+from sagemaker.workflow.functions import JsonGet
+
 from sagemaker.workflow.parameters import (
     ParameterInteger,
     ParameterString,
@@ -305,23 +304,7 @@ def get_step_create_model(bucket, region, role, sess, params, dependencies):
     '''
     transform_model_name = params['transform_model_name']
     inference_instance_type = params['inference_instance_type']
-#     inference_image_uri = sagemaker.image_uris.retrieve(
-#         framework="pytorch",
-#         region=region,
-#         version="1.8.1",
-#         py_version="py3",
-#         instance_type=inference_instance_type,
-#         image_scope='inference'
-#     )
-#     model = FrameworkModel(
-#         name=transform_model_name,
-#         image_uri=inference_image_uri,
-#         entry_point="inference.py",
-#         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
-#         sagemaker_session=sess,
-#         role=role,
-#         source_dir=BASE_DIR
-#     )
+
     model = PyTorchModel(
         name=transform_model_name,
         model_data=dependencies['step_train'].properties.ModelArtifacts.S3ModelArtifacts,
@@ -365,7 +348,6 @@ def get_step_transform(bucket, region, role, params, dependencies):
         name="KgTransform", transformer=transformer, inputs=TransformInput(data=batch_data)
     )
     return step_transform
-
 
 
 def get_step_register_model(model_package_group_name, params, dependencies):
@@ -478,31 +460,31 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
     raw_input_dataset = params['raw_input_dataset']
     neptune_metadata = properties['neptune_metadata']
     
-#     db_cluster_endpoint = JsonGet(
-#         step=dependencies['step_create_db'],
-#         property_file=neptune_metadata,
-#         json_path="cluster_endpoint",
-#     )
-#     db_cluster_port = JsonGet(
-#         step=dependencies['step_create_db'],
-#         property_file=neptune_metadata,
-#         json_path="cluster_port",
-#     )
-#     db_cluster_region = JsonGet(
-#         step=dependencies['step_create_db'],
-#         property_file=neptune_metadata,
-#         json_path="cluster_region",
-#     )
-#     iam_role_loadfroms3_arn = JsonGet(
-#         step=dependencies['step_create_db'],
-#         property_file=neptune_metadata,
-#         json_path="role_loadfroms3_arn",
-#     )
+    db_cluster_endpoint = JsonGet(
+        step_name=dependencies['step_create_db'].name,
+        property_file=neptune_metadata,
+        json_path="cluster_endpoint",
+    )
+    db_cluster_port = JsonGet(
+        step_name=dependencies['step_create_db'].name,
+        property_file=neptune_metadata,
+        json_path="cluster_port",
+    )
+    db_cluster_region = JsonGet(
+        step_name=dependencies['step_create_db'].name,
+        property_file=neptune_metadata,
+        json_path="cluster_region",
+    )
+    iam_role_loadfroms3_arn = JsonGet(
+        step_name=dependencies['step_create_db'].name,
+        property_file=neptune_metadata,
+        json_path="role_loadfroms3_arn",
+    )
 
-    db_cluster_endpoint = 'kg-neptune.cluster-c2ycbhkszo5s.us-east-1.neptune.amazonaws.com'
-    db_cluster_port = 8182
-    db_cluster_region = 'us-east-1'
-    iam_role_loadfroms3_arn = 'arn:aws:iam::093729152554:role/NeptuneLoadFromS3'
+    # db_cluster_endpoint = 'kg-neptune.cluster-c2ycbhkszo5s.us-east-1.neptune.amazonaws.com'
+    # db_cluster_port = 8182
+    # db_cluster_region = 'us-east-1'
+    # iam_role_loadfroms3_arn = 'arn:aws:iam::093729152554:role/NeptuneLoadFromS3'
     
     processor = SKLearnProcessor(
         framework_version="0.23-1",
@@ -612,7 +594,7 @@ def get_step_condition(params, dependencies, properties):
     evaluation_report = properties['evaluation_report']
     minimum_f1_condition = ConditionGreaterThanOrEqualTo(
         left=JsonGet(
-            step=dependencies['step_evaluate'],
+            step_name=dependencies['step_evaluate'].name,
             property_file=evaluation_report,
             json_path="f1",
         ),

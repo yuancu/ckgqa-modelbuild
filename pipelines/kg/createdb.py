@@ -5,6 +5,8 @@ Permissions Required:
 iam:GetAccountSummary on resource: *
 iam:ListAccountAliases on resource: *
 iam:PassRole on resource: * with iam:PassedToService restricted to rds.amazonaws.com
+rds:DescribeDBClusters
+rds:CreateDBClusters
 '''
 import os
 import argparse

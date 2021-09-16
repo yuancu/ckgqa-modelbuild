@@ -478,27 +478,32 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
     raw_input_dataset = params['raw_input_dataset']
     neptune_metadata = properties['neptune_metadata']
     
-    db_cluster_endpoint = JsonGet(
-        step=dependencies['step_create_db'],
-        property_file=neptune_metadata,
-        json_path="cluster_endpoint",
-    )
-    db_cluster_port = JsonGet(
-        step=dependencies['step_create_db'],
-        property_file=neptune_metadata,
-        json_path="cluster_port",
-    )
-    db_cluster_region = JsonGet(
-        step=dependencies['step_create_db'],
-        property_file=neptune_metadata,
-        json_path="cluster_region",
-    )
-    iam_role_loadfroms3_arn = JsonGet(
-        step=dependencies['step_create_db'],
-        property_file=neptune_metadata,
-        json_path="role_loadfroms3_arn",
-    )
+#     db_cluster_endpoint = JsonGet(
+#         step=dependencies['step_create_db'],
+#         property_file=neptune_metadata,
+#         json_path="cluster_endpoint",
+#     )
+#     db_cluster_port = JsonGet(
+#         step=dependencies['step_create_db'],
+#         property_file=neptune_metadata,
+#         json_path="cluster_port",
+#     )
+#     db_cluster_region = JsonGet(
+#         step=dependencies['step_create_db'],
+#         property_file=neptune_metadata,
+#         json_path="cluster_region",
+#     )
+#     iam_role_loadfroms3_arn = JsonGet(
+#         step=dependencies['step_create_db'],
+#         property_file=neptune_metadata,
+#         json_path="role_loadfroms3_arn",
+#     )
 
+    db_cluster_endpoint = 'kg-neptune.cluster-c2ycbhkszo5s.us-east-1.neptune.amazonaws.com'
+    db_cluster_port = 8182
+    db_cluster_region = 'us-east-1'
+    iam_role_loadfroms3_arn = 'arn:aws:iam::093729152554:role/NeptuneLoadFromS3'
+    
     processor = SKLearnProcessor(
         framework_version="0.23-1",
         role=role,
@@ -598,6 +603,7 @@ def get_step_condition(params, dependencies, properties):
         'step_create_model'
         'step_transform'
         'step_bulkload'
+        'step_create_db'
         'step_alert'
     properties:
         evaluation_report
@@ -615,9 +621,16 @@ def get_step_condition(params, dependencies, properties):
     minimum_f1_condition_step = ConditionStep(
         name="F1Condition",
         conditions=[minimum_f1_condition],
-        if_steps=[dependencies['step_register'], dependencies['step_create_model'], \
-            dependencies['step_transform'], dependencies['step_bulkload']],  # success, continue with model registration
-        else_steps=[dependencies['step_alert']],  # fail, end the pipeline
+        if_steps=[
+            dependencies['step_register'], 
+            dependencies['step_create_model'],
+            dependencies['step_transform'], 
+            dependencies['step_create_db'],
+            dependencies['step_bulkload']
+        ],  # success, continue with model registration
+        else_steps=[
+            dependencies['step_alert']
+        ],  # fail, end the pipeline
     )
     return minimum_f1_condition_step
 

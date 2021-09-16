@@ -394,6 +394,7 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
         db_instance_class
         iam_loadfroms3_role_name
     dependencies:
+        step_transform
     properties:
         neptune_metadata
     '''
@@ -440,6 +441,9 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
         ],
         property_files=[neptune_metadata]
     )
+    print(create_db_step)
+    print(dependencies['step_transform'])
+    create_db_step.add_depends_on([dependencies['step_transform']])
     return create_db_step
 
 
@@ -447,7 +451,6 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
     '''
     params:
         bulkload_instance_type
-        neptune_endpoint
         raw_input_dataset
     dependencies:
         step_transform
@@ -456,7 +459,6 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
         neptune_metadata
     '''
     bulkload_instance_type = params['bulkload_instance_type']
-    neptune_endpoint = params['neptune_endpoint']
     raw_input_dataset = params['raw_input_dataset']
     neptune_metadata = properties['neptune_metadata']
     
@@ -533,7 +535,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
             db_cluster_port
         ],
     )
-    bulkload_step.add_depends_on([dependencies['step_transform']])
+    bulkload_step.add_depends_on([dependencies['step_create_db']])
     return bulkload_step
 
 
@@ -679,7 +681,6 @@ def get_pipeline(
     
     # bulkload parameters
     bulkload_instance_type = ParameterString(name="BulkloadInstanceType", default_value="ml.m4.xlarge")
-    neptune_endpoint = ParameterString(name="NeptuneEndpoint", default_value='http://alb-neptune-test-62758122.us-east-1.elb.amazonaws.com')
     
     # register parameters
     model_approval_status = ParameterString(name="ModelApprovalStatus", default_value="PendingManualApproval")
@@ -798,7 +799,9 @@ def get_pipeline(
             'db_instance_class': db_instance_class,
             'iam_loadfroms3_role_name': iam_loadfroms3_role_name
         },
-        dependencies={},
+        dependencies={
+            'step_transform': step_transform
+        },
         properties={
             'neptune_metadata': neptune_metadata
         }
@@ -811,7 +814,6 @@ def get_pipeline(
         role=role,
         params={
             'bulkload_instance_type': bulkload_instance_type,
-            'neptune_endpoint': neptune_endpoint,
             'raw_input_dataset': raw_input_dataset
         },
         dependencies={
@@ -883,7 +885,6 @@ def get_pipeline(
             iam_loadfroms3_role_name,
 
             bulkload_instance_type,
-            neptune_endpoint,
             
             transform_instance_type,
             batch_data,
@@ -900,8 +901,4 @@ def get_pipeline(
         sagemaker_session=sess,
     )
     print('Pipeline created')
-#     from pprint import pprint
-#     import json
-#     definition = json.loads(pipeline.definition())
-#     pprint(definition)
     return pipeline

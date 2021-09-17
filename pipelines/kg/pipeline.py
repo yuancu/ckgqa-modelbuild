@@ -441,8 +441,6 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
         ],
         property_files=[neptune_metadata]
     )
-    print(create_db_step)
-    print(dependencies['step_transform'])
     create_db_step.add_depends_on([dependencies['step_transform']])
     return create_db_step
 

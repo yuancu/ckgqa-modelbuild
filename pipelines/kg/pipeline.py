@@ -390,7 +390,6 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
     '''
     params:
         db_cluster_identifier
-        db_instance_class
         iam_loadfroms3_role_name
     dependencies:
         step_transform
@@ -398,7 +397,6 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
         neptune_metadata
     '''
     db_cluster_identifier = params['db_cluster_identifier']
-    db_instance_class = params['db_instance_class']
     iam_loadfroms3_role_name = params['iam_loadfroms3_role_name']
     neptune_metadata = properties['neptune_metadata']
 
@@ -414,7 +412,7 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
     output_name = neptune_metadata.output_name
     output_neptune_metadata_filename = neptune_metadata.path.split('/')[-1]
     default_db_instance_suffix = 'instance-1'
-    
+    default_db_instance_class = 'db.t3.medium'
     create_db_step = ProcessingStep(
         name="RetrieveOrCreateNeptuneDB",
         code=os.path.join(BASE_DIR, 'createdb.py'),
@@ -430,7 +428,7 @@ def get_step_create_db(bucket, region, role, params, dependencies, properties):
             "--db-instance-suffix",
             default_db_instance_suffix,
             "--db-instance-class",
-            db_instance_class,
+            default_db_instance_class,
             "--load-from-s3-role-name",
             iam_loadfroms3_role_name,
             "--output-neptune-metadata-dir",
@@ -672,7 +670,6 @@ def get_pipeline(
     
     # create db step
     db_cluster_identifier = ParameterString(name="NeptuneClusterIdentifier", default_value="kg-neptune")
-    db_instance_class = ParameterString(name="NeptuneInstanceClass", default_value="db.t3.medium")
     iam_loadfroms3_role_name = ParameterString(name="IamLoadFromS3RoleName", default_value="NeptuneLoadFromS3")
     
     # bulkload parameters
@@ -791,7 +788,6 @@ def get_pipeline(
         role=role,
         params={
             'db_cluster_identifier': db_cluster_identifier,
-            'db_instance_class': db_instance_class,
             'iam_loadfroms3_role_name': iam_loadfroms3_role_name
         },
         dependencies={
@@ -875,7 +871,6 @@ def get_pipeline(
             inference_instance_type,
             
             db_cluster_identifier,
-            db_instance_class,
             iam_loadfroms3_role_name,
 
             bulkload_instance_type,

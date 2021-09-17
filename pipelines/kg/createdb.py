@@ -151,11 +151,11 @@ def create_s3_endpoint_if_not_exist(db_cluster_region, vpc_id):
 if __name__ == '__main__':
     '''
     Invoke
-    python createdb.py --db-cluster-identifier test-111
+    python createdb.py --db-cluster-identifier [your-cluster-identifier]
     To delete db instance:
-    aws neptune delete-db-instance --db-instance-identifier kg-neptune-3-instance-1 
+    aws neptune delete-db-instance --db-instance-identifier [your-instance-identifier]
     To delete db cluster:
-    aws neptune delete-db-cluster --db-cluster-identifier kg-neptune-3 --skip-final-snapshot
+    aws neptune delete-db-cluster --db-cluster-identifier [your-cluster-identifier] --skip-final-snapshot
     '''
     
     args, _ = parse_args()

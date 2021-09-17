@@ -148,6 +148,24 @@ def create_s3_endpoint_if_not_exist(db_cluster_region, vpc_id):
     return vpc_endpoint
 
 
+def get_instances_by_cluster(db_cluster_identifier):
+    neptune = boto3.client('neptune')
+    response = neptune.describe_db_instances(
+        Filters=[
+            {
+                'Name': 'db-cluster-id',
+                'Values': [db_cluster_identifier]
+            },
+            {
+                'Name': 'engine',
+                'Values': ['neptune']
+            }
+        ]
+    )
+    db_instances = response['DBInstances']
+    return db_instances
+
+
 if __name__ == '__main__':
     '''
     Invoke
@@ -161,18 +179,26 @@ if __name__ == '__main__':
     args, _ = parse_args()
     
     db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
+    # Wait for Neptune cluster to come online
     while db_cluster['Status'] == 'creating':
         logger.info(f"Cluster {args.db_cluster_identifier} is in status \'creating\', waiting...")
         time.sleep(30) # check status every 30 seconds
         db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
     logger.info(f"Cluster {args.db_cluster_identifier} is now in status \'{db_cluster['Status']}\'")
     
-    db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    db_instances = get_instances_by_cluster(args.db_cluster_identifier)
+    if len(db_instances) > 0:
+        logger.info(f"There exists instances within cluster {args.db_cluster_identifier}")
+        db_instance = db_instances[0]
+    else:
+        db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    
+    # Wait for neptune instance to come online
     while db_instance['DBInstanceStatus'] == 'creating':
-        logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is in status \'creating\', waiting...")
+        logger.info(f"Instance {db_instance['DBInstanceIdentifier']} is in status \'creating\', waiting...")
         time.sleep(30) # check status every 30 seconds
         db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
-    logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is now in status \'{db_instance['DBInstanceStatus']}\'")
+    logger.info(f"Instance {db_instance['DBInstanceIdentifier']} is now in status \'{db_instance['DBInstanceStatus']}\'")
     
     iam_role_loadfroms3 = get_or_create_loadfroms3_role(args.load_from_s3_role_name)
     

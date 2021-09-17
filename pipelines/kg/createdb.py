@@ -9,6 +9,7 @@ rds:DescribeDBClusters
 rds:CreateDBClusters
 '''
 import os
+import time
 import argparse
 import json
 import logging
@@ -148,10 +149,31 @@ def create_s3_endpoint_if_not_exist(db_cluster_region, vpc_id):
 
 
 if __name__ == '__main__':
+    '''
+    Invoke
+    python createdb.py --db-cluster-identifier test-111
+    To delete db instance:
+    aws neptune delete-db-instance --db-instance-identifier kg-neptune-3-instance-1 
+    To delete db cluster:
+    
+    '''
+    
     args, _ = parse_args()
     
     db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
+    while db_cluster['Status'] == 'creating':
+        logger.info(f"Cluster {args.db_cluster_identifier} is in status \'creating\', waiting...")
+        time.sleep(30) # check status every 30 seconds
+        db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
+    logger.info(f"Cluster {args.db_cluster_identifier} is now in status \'{db_cluster['Status']}\'")
+    
     db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    while db_instance['DBInstanceStatus'] == 'creating':
+        logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is in status \'creating\', waiting...")
+        time.sleep(30) # check status every 30 seconds
+        db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is now in status \'{db_instance['DBInstanceStatus']}\'")
+    
     iam_role_loadfroms3 = get_or_create_loadfroms3_role(args.load_from_s3_role_name)
     
     db_cluster_arn = db_cluster['DBClusterArn']

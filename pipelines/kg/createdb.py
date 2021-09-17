@@ -155,7 +155,7 @@ if __name__ == '__main__':
     To delete db instance:
     aws neptune delete-db-instance --db-instance-identifier kg-neptune-3-instance-1 
     To delete db cluster:
-    
+    aws neptune delete-db-cluster --db-cluster-identifier kg-neptune-3 --skip-final-snapshot
     '''
     
     args, _ = parse_args()

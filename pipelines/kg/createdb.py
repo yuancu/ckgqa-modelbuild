@@ -24,7 +24,7 @@ logger.addHandler(logging.StreamHandler())
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--db-cluster-identifier', type=str, default='kg-neptune', help='Neptune cluster name. If not exists, one with this name will be created.')
-    parser.add_argument('--db-instance-suffix', type=str, default='instance-1', help='A database instance identifier will be named as [db-cluster-identifier]-[db-instance-suffix]. An instance with this name will be created if it does not exist.')
+    parser.add_argument('--db-instance-suffix', type=str, default='instance-1', help='If there does not exist any instance within the cluster, an instance with id [db-cluster-identifier]-[db-instance-suffix] will be created.')
     parser.add_argument('--db-instance-class', type=str, default='db.t3.medium')
     parser.add_argument('--load-from-s3-role-name', type=str, default='NeptuneLoadFromS3', help='The name of role that allows Neptune to access S3. A role with this name will be created if it does not exist.')
     parser.add_argument('--output-neptune-metadata-dir', type=str, default='/opt/ml/processing/output/',)

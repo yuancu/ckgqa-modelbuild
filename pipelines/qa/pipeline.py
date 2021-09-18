@@ -209,7 +209,7 @@ def get_step_training(bucket, region, role, params, dependencies):
     )
     rules = [ProfilerRule.sagemaker(rule_configs.ProfilerReport())]
     estimator = PyTorch(
-        entry_point = 'main.py',
+        entry_point = 'train.py',
         role=role,
         instance_type=train_instance_type, # ml.c5.4xlarge, ml.g4dn.4xlarge
         instance_count=train_instance_count,
@@ -222,8 +222,6 @@ def get_step_training(bucket, region, role, params, dependencies):
         hyperparameters={
             'task': 'naive',
             'model_type': 'bert',
-            'do_train': 'True',
-            'do_eval': 'False',
             'train_batch_size': batch_size,
             'max_seq_len': max_seq_len,
             'learning_rate': learning_rate,
@@ -271,7 +269,7 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
     evaluation_step = ProcessingStep(
         name="EvaluateModel",
         processor=evaluation_processor,
-        code=os.path.join(BASE_DIR, "main.py"),
+        code=os.path.join(BASE_DIR, "evaluate.py"),
         inputs=[
             ProcessingInput(
                 input_name='model',
@@ -292,8 +290,6 @@ def get_step_evaluation(bucket, region, role, params, dependencies):
             ),
         ],
         job_arguments=[
-            "--do_eval", "True",
-            "--do_train", "False",
             "--model_dir", "/opt/ml/processing/input/model/",
             "--task", "naive",
             "--model_type", "bert",

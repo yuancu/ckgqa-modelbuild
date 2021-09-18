@@ -9,8 +9,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from predict import get_args, load_model, read_input_file, predict_helper, convert_input_file_to_tensor_dataset
-from utils import load_tokenizer, get_intent_labels, get_slot_labels
+from joint_bert.predict import get_args, load_model, read_input_file, predict_helper, convert_input_file_to_tensor_dataset
+from joint_bert.utils import load_tokenizer, get_intent_labels, get_slot_labels
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

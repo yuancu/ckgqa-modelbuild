@@ -16,12 +16,16 @@ def create_parser():
     parser.add_argument("--task", default=None, required=True, type=str, help="The name of the task to train")
     try:
         parser.add_argument("--data_dir", default=os.environ['SM_CHANNEL_TRAIN'], type=str, help="The input data dir")
-        parser.add_argument('--output_data_dir', default=os.environ['SM_OUTPUT_DATA_DIR'], type=str, help="The output data dir")
+    except:
+        parser.add_argument("--data_dir", required=True, type=str, help="The input data dir")
+    try:
         parser.add_argument("--model_dir", default=os.environ['SM_MODEL_DIR'], type=str, help="Path to save, load model")
     except:
-        logger.info('System env SM_CHANNEL_TRAIN and SM_OUTPUT_DATA_DIR does not exist')
         parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
-        parser.add_argument("--data_dir", required=True, type=str, help="The input data dir")
+    try:
+        parser.add_argument('--output_data_dir', default=os.environ['SM_OUTPUT_DATA_DIR'], type=str, help="The output data dir")
+    except:
+        logger.info('System env SM_CHANNEL_TRAIN and SM_OUTPUT_DATA_DIR does not exist')
         parser.add_argument('--output_data_dir', type=str, help="The output data dir")
     parser.add_argument("--intent_label_file", default="intent_label.txt", type=str, help="Intent Label file")
     parser.add_argument("--slot_label_file", default="slot_label.txt", type=str, help="Slot Label file")

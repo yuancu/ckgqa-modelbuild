@@ -18,11 +18,16 @@ if __name__ == '__main__':
                   --model_dir outputs/model \
                   --data_dir processed \
                   --output_data_dir outputs/data \
-                  --num_train_epochs 1
+                  --num_train_epochs 1 \
+                  --save_steps 5
     '''
     args = parse_args()
     args.do_train = 'True'
     args.do_eval = 'False'
+    # Convert relative path to absolute path before pass on
+    args.data_dir = os.path.abspath(args.data_dir)
+    args.model_dir = os.path.abspath(args.model_dir)
+    args.output_data_dir = os.path.abspath(args.output_data_dir)
     
     print(f"Files under data dir {args.data_dir}: {os.listdir(args.data_dir)}")
     if len(os.listdir(args.data_dir))==1 and os.listdir(args.data_dir)[0].endswith('.tar.gz'):

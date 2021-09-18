@@ -17,10 +17,15 @@ except:
 if __name__ == '__main__':
     '''
     Invoke test:
-    python evaluate.py --model_dir outputs/model --task naive --output_data_dir outputs/data --do_eval True --do_train False --data_dir processed
+    python evaluate.py --model_dir outputs/model --task naive --output_data_dir outputs/data --data_dir processed
     '''
-
     args = parse_args()
+    args.do_eval = 'True'
+    args.do_train = 'False'
+    # Convert relative path to absolute path before pass on
+    args.data_dir = os.path.abspath(args.data_dir)
+    args.model_dir = os.path.abspath(args.model_dir)
+    args.output_data_dir = os.path.abspath(args.output_data_dir)
     # Unzip model file
     logger.info(f"Files under model dir {args.model_dir}: {os.listdir(args.model_dir)}")
     if len(os.listdir(args.model_dir))>0 and 'model.tar.gz' in os.listdir(args.model_dir):

@@ -1,23 +1,14 @@
 import os
-import sys
 import argparse
 import logging
-import shutil
-import pathlib
-import json
-import tarfile
-import subprocess
     
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-try:
-    from trainer import Trainer
-    from utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
-    from data_loader import load_and_cache_examples 
-except:
-    logger.info("trainer, utils and data_loader modules are not available yet")
+from .trainer import Trainer
+from .utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
+from .data_loader import load_and_cache_examples 
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -70,7 +61,7 @@ def parse_args():
     return parser.parse_args()
 
 def main(args): 
-    args.model_name_or_path = MODEL_PATH_MAP[args.model_type]   
+    args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
     init_logger()
     set_seed(args)
     tokenizer = load_tokenizer(args)

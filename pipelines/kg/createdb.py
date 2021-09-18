@@ -5,6 +5,7 @@ Permissions Required:
 iam:GetAccountSummary on resource: *
 iam:ListAccountAliases on resource: *
 iam:PassRole on resource: * with iam:PassedToService restricted to rds.amazonaws.com
+iam:CreateRole
 rds:DescribeDBClusters
 rds:CreateDBClusters
 '''

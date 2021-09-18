@@ -17,18 +17,19 @@ except:
 if __name__ == '__main__':
     '''
     Invoke test:
-    python evaluate.py --model_dir outputs --task naive --output_data_dir outputs --do_eval=True --do_train=False --data_dir processed
+    python evaluate.py --model_dir outputs/model --task naive --output_data_dir outputs/data --do_eval True --do_train False --data_dir processed
     '''
 
     args = parse_args()
     # Unzip model file
     logger.info(f"Files under model dir {args.model_dir}: {os.listdir(args.model_dir)}")
-    if len(os.listdir(args.model_dir))>0 and os.listdir(args.model_dir)[0]=='model.tar.gz':
+    if len(os.listdir(args.model_dir))>0 and 'model.tar.gz' in os.listdir(args.model_dir):
         model_tar_path = "{}/model.tar.gz".format(args.model_dir)
         model_tar = tarfile.open(model_tar_path)
         model_tar.extractall(args.model_dir)
         model_tar.close()
-    logger.info(f"Model dir {args.model_dir} after extraction: {os.listdir(args.model_dir)}")
+        os.unlink(os.path.join(args.model_dir, 'model.tar.gz'))
+        logger.info(f"Model dir {args.model_dir} after extraction: {os.listdir(args.model_dir)}")
     if 'code' in os.listdir(args.model_dir):
         code_dir = os.path.join(args.model_dir, 'code')
         logger.info(f"Files under code dir {code_dir}: {os.listdir(code_dir)}")

@@ -18,13 +18,11 @@ if __name__ == '__main__':
     '''
     parser = argparse.ArgumentParser()
     try:
-        parser.add_argument("--model_dir", default=os.environ['SM_MODEL_DIR'], type=str, help="Path to save, load model")
-        parser.add_argument("--data_dir", default=os.environ['SM_CHANNEL_TRAIN'], type=str, help="The input data dir")
         parser.add_argument('--output_data_dir', default=os.environ['SM_OUTPUT_DATA_DIR'], type=str, help="The output data dir")
     except:
-        parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
-        parser.add_argument("--data_dir", required=True, type=str, help="The input data dir")
         parser.add_argument('--output_data_dir', type=str, help="The output data dir")
+    parser.add_argument("--model_dir", required=True, type=str, help="Path to save, load model")
+    parser.add_argument("--data_dir", required=True, type=str, help="The input data dir")
     parser.add_argument('--do_train', type=str)
     parser.add_argument('--do_eval', type=str)
     args, other_args = parser.parse_known_args()

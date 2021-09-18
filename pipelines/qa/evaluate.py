@@ -11,22 +11,10 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-# model_dir = "/opt/ml/processing/input/model"
-# logger.info(f"Files under model dir {model_dir}: {os.listdir(model_dir)}")
-# if len(os.listdir(model_dir))>0 and 'model.tar.gz' in os.listdir(model_dir):
-#     model_tar_path = "{}/model.tar.gz".format(model_dir)
-#     model_tar = tarfile.open(model_tar_path)
-#     model_tar.extractall(model_dir)
-#     model_tar.close()
-#     os.unlink(os.path.join(model_dir, 'model.tar.gz'))
-#     logger.info(f"Model dir {model_dir} after extraction: {os.listdir(model_dir)}")
-#     sys.path.append(model_dir+'/code')
-
-
 if __name__ == '__main__':
     '''
     Invoke test:
-    python evaluate.py --model_dir outputs/model --task naive --output_data_dir outputs/data --data_dir processed
+    python evaluate.py --model_dir compressed_model --task naive --output_data_dir outputs/data --data_dir processed
     '''
     parser = argparse.ArgumentParser()
     try:
@@ -71,7 +59,7 @@ if __name__ == '__main__':
     
     parser = create_parser()
     # Redefine args with parser from joint_bert
-    args = parser.parse_args(other_args.extend([
+    other_args.extend([
         '--do_eval',
         args.do_eval,
         '--do_train',
@@ -82,7 +70,8 @@ if __name__ == '__main__':
         args.model_dir,
         '--output_data_dir',
         args.output_data_dir
-    ]))
+    ])
+    args = parser.parse_args(other_args)
     
     eval_results = main(args)
     pathlib.Path(args.output_data_dir).mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@ Permissions Required:
 iam:GetAccountSummary on resource: *
 iam:ListAccountAliases on resource: *
 iam:PassRole on resource: * with iam:PassedToService restricted to rds.amazonaws.com
+iam:CreateRole
 rds:DescribeDBClusters
 rds:CreateDBClusters
 '''
@@ -24,7 +25,7 @@ logger.addHandler(logging.StreamHandler())
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--db-cluster-identifier', type=str, default='kg-neptune', help='Neptune cluster name. If not exists, one with this name will be created.')
-    parser.add_argument('--db-instance-suffix', type=str, default='instance-1', help='A database instance identifier will be named as [db-cluster-identifier]-[db-instance-suffix]. An instance with this name will be created if it does not exist.')
+    parser.add_argument('--db-instance-suffix', type=str, default='instance-1', help='If there does not exist any instance within the cluster, an instance with id [db-cluster-identifier]-[db-instance-suffix] will be created.')
     parser.add_argument('--db-instance-class', type=str, default='db.t3.medium')
     parser.add_argument('--load-from-s3-role-name', type=str, default='NeptuneLoadFromS3', help='The name of role that allows Neptune to access S3. A role with this name will be created if it does not exist.')
     parser.add_argument('--output-neptune-metadata-dir', type=str, default='/opt/ml/processing/output/',)
@@ -148,6 +149,24 @@ def create_s3_endpoint_if_not_exist(db_cluster_region, vpc_id):
     return vpc_endpoint
 
 
+def get_instances_by_cluster(db_cluster_identifier):
+    neptune = boto3.client('neptune')
+    response = neptune.describe_db_instances(
+        Filters=[
+            {
+                'Name': 'db-cluster-id',
+                'Values': [db_cluster_identifier]
+            },
+            {
+                'Name': 'engine',
+                'Values': ['neptune']
+            }
+        ]
+    )
+    db_instances = response['DBInstances']
+    return db_instances
+
+
 if __name__ == '__main__':
     '''
     Invoke
@@ -161,18 +180,26 @@ if __name__ == '__main__':
     args, _ = parse_args()
     
     db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
+    # Wait for Neptune cluster to come online
     while db_cluster['Status'] == 'creating':
         logger.info(f"Cluster {args.db_cluster_identifier} is in status \'creating\', waiting...")
         time.sleep(30) # check status every 30 seconds
         db_cluster = get_or_create_db_cluster(args.db_cluster_identifier)
     logger.info(f"Cluster {args.db_cluster_identifier} is now in status \'{db_cluster['Status']}\'")
     
-    db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    db_instances = get_instances_by_cluster(args.db_cluster_identifier)
+    if len(db_instances) > 0:
+        logger.info(f"There exists instances within cluster {args.db_cluster_identifier}")
+        db_instance = db_instances[0]
+    else:
+        db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
+    
+    # Wait for neptune instance to come online
     while db_instance['DBInstanceStatus'] == 'creating':
-        logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is in status \'creating\', waiting...")
+        logger.info(f"Instance {db_instance['DBInstanceIdentifier']} is in status \'creating\', waiting...")
         time.sleep(30) # check status every 30 seconds
         db_instance = get_or_create_db_instance(args.db_cluster_identifier, args.db_instance_suffix, args.db_instance_class)
-    logger.info(f"Instance {args.db_cluster_identifier}-{args.db_instance_suffix} is now in status \'{db_instance['DBInstanceStatus']}\'")
+    logger.info(f"Instance {db_instance['DBInstanceIdentifier']} is now in status \'{db_instance['DBInstanceStatus']}\'")
     
     iam_role_loadfroms3 = get_or_create_loadfroms3_role(args.load_from_s3_role_name)
     

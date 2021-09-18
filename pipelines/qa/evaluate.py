@@ -1,6 +1,8 @@
 import os
+from pipelines.qa.joint_bert import model
 import sys
 import json
+import pathlib
 import logging
 import subprocess
 import tarfile
@@ -9,10 +11,19 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-try:
-    from joint_bert.main import main, parse_args
-except:
-    logger.info("joint bert module is not available yet")
+model_dir = "/opt/ml/processing/input/model"
+logger.info(f"Files under model dir {model_dir}: {os.listdir(model_dir)}")
+if len(os.listdir(model_dir))>0 and 'model.tar.gz' in os.listdir(model_dir):
+    model_tar_path = "{}/model.tar.gz".format(model_dir)
+    model_tar = tarfile.open(model_tar_path)
+    model_tar.extractall(model_dir)
+    model_tar.close()
+    os.unlink(os.path.join(model_dir, 'model.tar.gz'))
+    logger.info(f"Model dir {model_dir} after extraction: {os.listdir(model_dir)}")
+    sys.path.append(model+'/code')
+
+from joint_bert.main import main, parse_args
+
 
 if __name__ == '__main__':
     '''
@@ -44,6 +55,7 @@ if __name__ == '__main__':
         from joint_bert.main import main, parse_args 
 
     eval_results = main(args)
+    pathlib.Path(args.output_data_dir).mkdir(parents=True, exist_ok=True)
     out_fn = os.path.join(args.output_data_dir, 'evaluation.json')
     logger.info(f"Dumping evaluation results to {out_fn}")
     with open(out_fn, 'w') as f:

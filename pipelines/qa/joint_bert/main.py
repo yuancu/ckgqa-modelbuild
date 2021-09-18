@@ -10,7 +10,7 @@ from .trainer import Trainer
 from .utils import init_logger, load_tokenizer, read_prediction_text, set_seed, MODEL_CLASSES, MODEL_PATH_MAP
 from .data_loader import load_and_cache_examples 
 
-def parse_args():
+def create_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--task", default=None, required=True, type=str, help="The name of the task to train")
@@ -58,6 +58,10 @@ def parse_args():
     parser.add_argument("--use_crf", action="store_true", help="Whether to use CRF")
     parser.add_argument("--slot_pad_label", default="PAD", type=str, help="Pad token for slot label pad (to be ignore when calculate loss)")
 
+    return parser
+
+def parse_args():
+    parser = create_parser()
     return parser.parse_args()
 
 def main(args): 

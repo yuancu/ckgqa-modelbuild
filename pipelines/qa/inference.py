@@ -48,6 +48,7 @@ def model_fn(model_dir):
     )
     train_args_bin = os.path.join(pred_config.model_dir, 'training_args.bin')
     logger.info(f"MD5 of training args: {md5(train_args_bin)}")
+    print(f"torch version: {torch.__version__}")
     
     args = get_args(pred_config)
     args.data_dir = os.path.join(model_dir, 'train_meta')

@@ -49,6 +49,7 @@ def model_fn(model_dir):
     
     args = get_args(pred_config)
     args.data_dir = os.path.join(model_dir, 'train_meta')
+    args.model_dir = model_dir
     logger.info(f"Args: {args}")
     train_args_bin = os.path.join(pred_config.model_dir, 'training_args.bin')
     logger.info(f"MD5 of training args: {md5(train_args_bin)}")

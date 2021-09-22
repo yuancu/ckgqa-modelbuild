@@ -1,6 +1,7 @@
 import os
 import logging
 import shutil
+import pathlib
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -45,3 +46,8 @@ if __name__ == '__main__':
     shutil.copy('./inference.py', f"{args.model_dir}/code/")
     shutil.copy('./evaluate.py', f"{args.model_dir}/code/")
     shutil.copy('./requirements.txt', f"{args.model_dir}/code/")
+    # copy train data to model dir, 
+    pathlib.Path(f"{args.model_dir}/train_meta").mkdir(parents=True, exist_ok=True)
+    shutil.copy(f"{args.data_dir}/intent_label.txt", f"{args.model_dir}/train_meta/")
+    shutil.copy(f"{args.data_dir}/slot_label.txt", f"{args.model_dir}/train_meta/")
+    shutil.copytree(f"{args.data_dir}/schema/", f"{args.model_dir}/schema/")

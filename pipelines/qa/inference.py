@@ -40,8 +40,10 @@ def model_fn(model_dir):
     )
     
     args = get_args(pred_config)
+    args.data_dir = os.path.join(model_dir, 'train_meta')
+
     model = load_model(pred_config, args, device)
-    
+
     intent_label_lst = get_intent_labels(args)
     slot_label_lst = get_slot_labels(args)
     

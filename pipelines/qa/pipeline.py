@@ -37,10 +37,8 @@ from sagemaker.processing import (
 )
 from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.workflow.conditions import ConditionGreaterThanOrEqualTo, ConditionLessThanOrEqualTo
-from sagemaker.workflow.condition_step import (
-    ConditionStep,
-    JsonGet,
-)
+from sagemaker.workflow.condition_step import ConditionStep
+from sagemaker.workflow.functions import JsonGet
 from sagemaker.workflow.parameters import (
     ParameterInteger,
     ParameterString,
@@ -380,7 +378,7 @@ def get_step_condition(evaluation_report, params, dependencies):
     min_slot_f1 = params['min_slot_f1']
     min_intent_acc_condition = ConditionGreaterThanOrEqualTo(
         left=JsonGet(
-            step=dependencies['step_evaluate'],
+            step_name=dependencies['step_evaluate'].name,
             property_file=evaluation_report,
             json_path="intent_acc",
         ),
@@ -388,7 +386,7 @@ def get_step_condition(evaluation_report, params, dependencies):
     )
     min_slot_f1_condition = ConditionGreaterThanOrEqualTo(
         left=JsonGet(
-            step=dependencies['step_evaluate'],
+            step_name=dependencies['step_evaluate'].name,
             property_file=evaluation_report,
             json_path="slot_f1",
         ),

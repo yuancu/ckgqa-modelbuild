@@ -2,6 +2,7 @@ import os
 import json
 import sys
 import logging
+import hashlib
 from argparse import Namespace
 
 import pandas as pd
@@ -24,6 +25,13 @@ logger.info(f"Working directory: {cwd}")
 logger.info(f"files under working directory: {os.listdir(cwd)}")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
 ###################################
 ### SAGEMKAER LOAD MODEL FUNCTION
 ###################################
@@ -41,7 +49,9 @@ def model_fn(model_dir):
     
     args = get_args(pred_config)
     args.data_dir = os.path.join(model_dir, 'train_meta')
-
+    logger.info(f"Args: {args}")
+    train_args_bin = os.path.join(pred_config.model_dir, 'training_args.bin')
+    logger.info(f"MD5 of training args: {md5(train_args_bin)}")
     model = load_model(pred_config, args, device)
 
     intent_label_lst = get_intent_labels(args)

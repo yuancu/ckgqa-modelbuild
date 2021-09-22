@@ -13,6 +13,7 @@ Implements a get_pipeline(**kwargs) method.
 
 import os
 import time
+from datetime import datetime
 
 import boto3
 import sagemaker
@@ -361,6 +362,7 @@ def get_step_register_model(model_package_group_name, params, dependencies):
         model_package_group_name=model_package_group_name,
         approval_status=model_approval_status,
         model_metrics=model_metrics,
+        description=f"Created on {datetime.now()}"
     )
     return step_register
 

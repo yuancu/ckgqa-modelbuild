@@ -1,14 +1,10 @@
 import os
 import json
-import sys
 import logging
 import hashlib
 from argparse import Namespace
 
-import pandas as pd
 import torch
-from torch import nn
-from torch.utils.data import DataLoader
 
 from joint_bert.predict import get_args, load_model, read_input_file, predict_helper, convert_input_file_to_tensor_dataset
 from joint_bert.utils import load_tokenizer, get_intent_labels, get_slot_labels
@@ -101,10 +97,9 @@ def predict_fn(input_data, model):
         'slot_labels': slot_preds_list
     }
     
-    
-    
-    print('intention[0] type', type(intent_preds[0]))
-    print('slot_labels[0][0] type', type(slot_preds_list[0][0]))
+    logger.info(f"Results:\nText: {predict_result['text']}\nSlot labels: {predict_result['slot_labels']}")
+    logger.info(f"intention[0] type {type(intent_preds[0])}")
+    logger.info(f"slot_labels[0][0] type: {type(slot_preds_list[0][0])}")
 
     return predict_result
 
@@ -113,7 +108,7 @@ def predict_fn(input_data, model):
 ### SAGEMKAER MODEL INPUT FUNCTION
 ###################################
 
-def input_fn(serialized_input_data, content_type="text/csv"):
+def input_fn(serialized_input_data, content_type="application/jsonlines"):
     lines = []
     for line in serialized_input_data:
         line = line.strip()
@@ -136,8 +131,10 @@ def output_fn(prediction_output, accept="application/json"):
 
 # test inference code locally
 if __name__ == '__main__':
-    model = model_fn('outputs')
-    with open('processed/test/seq.in') as f:
-        lines = input_fn(f, content_type="text/csv")
+    import jsonlines
+    model = model_fn('outputs/model')
+    with open('processed/psuedo/seq.in') as f:
+        lines = f.readlines()
+        lines = input_fn(lines)
     predict_result = predict_fn(lines, model)
     json_out = output_fn(predict_result, accept="application/json")

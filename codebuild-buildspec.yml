@@ -9,6 +9,7 @@ phases:
       - pip install -U sagemaker
       - pip install -r pipelines/kg/requirements.txt
       - pip install -r pipelines/qa/requirements.txt
+      - pip install tensorboard
       - echo "Current working directory is $(pwd)"
       - echo "Files under current folder are \n$(ls)"
       - echo "Files under pipelins $(ls -R pipelines)"

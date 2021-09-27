@@ -502,7 +502,7 @@ def get_pipeline(
 
     # condition parameters
     min_intent_acc = ParameterFloat(name="MinIntentAccuracy", default_value=0.9)
-    min_slot_f1 = ParameterFloat(name="MinSlotF1", default_value=0.95)
+    min_slot_f1 = ParameterFloat(name="MinSlotF1", default_value=0.94)
 
     step_process = get_step_processing(
         bucket=default_bucket,
@@ -583,7 +583,7 @@ def get_pipeline(
             'alert_phones': alert_phones
         },
         dependencies={
-            
+
         }
     )
 

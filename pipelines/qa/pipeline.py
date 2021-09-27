@@ -627,6 +627,9 @@ def get_pipeline(
             model_approval_status,
             deploy_instance_type,
 
+            alert_emails,
+            alert_phones,
+
             min_intent_acc,
             min_slot_f1
         ],

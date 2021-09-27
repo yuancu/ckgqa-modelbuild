@@ -109,9 +109,17 @@ def predict_fn(input_data, model):
 ###################################
 
 def input_fn(serialized_input_data, content_type="application/jsonlines"):
+    logger.info(serialized_input_data)
     lines = []
+    if type(serialized_input_data) == str:
+        serialized_input_data = serialized_input_data.split('\n')
+        logger.info(f"Got {len(serialized_input_data)} sentences")
+    else:
+        logger.info(f"serialized_input_data is of type {type(serialized_input_data)}")
     for line in serialized_input_data:
         line = line.strip()
+        if line == '':
+            continue
         # words = line.split()
         words = list(line)
         lines.append(words)

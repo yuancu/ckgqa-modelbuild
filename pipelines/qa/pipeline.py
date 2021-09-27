@@ -364,6 +364,45 @@ def get_step_register_model(model_package_group_name, params, dependencies):
     )
     return step_register
 
+
+def get_step_alert(bucket, region, role, params, dependencies):
+    '''
+    params:
+        alert_emails
+        alert_phones
+    dependencies:
+        step_evaluate
+    '''
+    alert_emails = params['alert_emails']
+    alert_phones = params['alert_phones']
+
+    processor = SKLearnProcessor(
+        framework_version="0.23-1",
+        role=role,
+        instance_type="ml.t3.medium",
+        instance_count=1,
+        env={"AWS_DEFAULT_REGION": region},
+    )
+    
+    # TODO: get metrics from step_evaluate or step_evaluate
+    alert_step = ProcessingStep(
+        name="AlertDevTeam",
+        code=os.path.join(BASE_DIR, 'alert.py'),
+        processor=processor,
+        job_arguments=[
+            "--alert-topic",
+            "DummyTopic",
+            "--alert-message",
+            "DummyContent",
+            "--alert-emails",
+            alert_emails,
+            "--alert_phones",
+            alert_phones
+        ],
+    )
+    return alert_step
+
+
 def get_step_condition(evaluation_report, params, dependencies):
     '''
     params:
@@ -373,6 +412,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         'step_evaluate'
         'step_register'
         'step_create_model'
+        'step_alert'
     '''
     min_intent_acc = params['min_intent_acc']
     min_slot_f1 = params['min_slot_f1']
@@ -396,7 +436,7 @@ def get_step_condition(evaluation_report, params, dependencies):
         name="IntentAndSlotCondition",
         conditions=[min_intent_acc_condition, min_slot_f1_condition],
         if_steps=[dependencies['step_register'], dependencies['step_create_model']],  # success, continue with model registration
-        else_steps=[],  # fail, end the pipeline
+        else_steps=[dependencies['step_alert']],  # fail, end the pipeline
     )
     return condition_step
 
@@ -455,6 +495,10 @@ def get_pipeline(
     model_approval_status = ParameterString(name="ModelApprovalStatus", default_value="PendingManualApproval")
     deploy_instance_type = ParameterString(name="DeployInstanceType", default_value="ml.m4.xlarge")
     # deploy_instance_count = ParameterInteger(name="DeployInstanceCount", default_value=1)
+
+    # alert parameters
+    alert_emails = ParameterString(name="AlertEmails", default_value="yuanchu@amazon.com")
+    alert_phones = ParameterString(name="AlertPhones", default_value="+8613121277075")
 
     # condition parameters
     min_intent_acc = ParameterFloat(name="MinIntentAccuracy", default_value=0.9)
@@ -530,6 +574,19 @@ def get_pipeline(
         }
     )
 
+    step_alert = get_step_alert(
+        bucket=default_bucket,
+        region=region,
+        role=role,
+        params={
+            'alert_emails': alert_emails,
+            'alert_phones': alert_phones
+        },
+        dependencies={
+            
+        }
+    )
+
     evaluation_report = PropertyFile(name="EvaluationReport", output_name="metrics", path="evaluation.json")
     step_condition = get_step_condition(
         evaluation_report=evaluation_report,
@@ -541,6 +598,7 @@ def get_pipeline(
             'step_evaluate': step_evaluate,
             'step_register': step_register_model,
             'step_create_model': step_create_model,
+            'step_alert': step_alert
         }
     )
 

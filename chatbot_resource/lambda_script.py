@@ -13,6 +13,8 @@ AWS_REGION
 AWS_SESSION_TOKEN
 neptuneEndpoint
 neptunePort
+nluEndpoint
+USE_IAM (optional)
 '''
 
 import os
@@ -35,6 +37,13 @@ from botocore.awsrequest import AWSRequest
 from botocore.credentials import ReadOnlyCredentials
 from types import SimpleNamespace
 
+import json
+import sagemaker
+from sagemaker.pytorch.model import PyTorchPredictor
+from sagemaker.serializers import CSVSerializer
+from sagemaker.deserializers import JSONDeserializer
+
+
 reconnectable_err_msgs = [
     'ReadOnlyViolationException',
     'Server disconnected',
@@ -47,6 +56,66 @@ retriable_err_msgs = [
 network_errors = [WebSocketClosedError, OSError]
 
 retriable_errors = [GremlinServerError] + network_errors
+
+
+def parse_questions(questions, nlu_endpoint_name, sagemaker_session):
+    '''
+    Args:
+        questions (list(str)): A list of natural language questions
+        nlu_endpoint_name
+    '''
+    sess = sagemaker.Session()
+    predictor = PyTorchPredictor(
+        endpoint_name=nlu_endpoint_name,
+        sagemaker_session=sagemaker_session,
+        serializer=CSVSerializer(),
+        deserializer=JSONDeserializer(),
+    )
+    predicted = predictor.predict(questions)
+    return predicted['text'], predicted['intentions'], predicted['slot_labels']
+
+
+def extract_slot_values(question, seq_label):
+    assert len(question) == len(seq_label), f"question {question} should have the same \
+length with sequence label {seq_label} ({len(question)} != {len(seq_label)})"
+    value_buf = ''
+    slot_buf = ''
+    values = []
+    slots = []
+    for i, l in enumerate(seq_label):
+        if l.startswith('B'):
+            if value_buf != '':
+                values.append(value_buf)
+                slots.append(slot_buf)
+            slot_buf = l[2:] # extract label part from B_label
+            value_buf = question[i]
+        elif l.startswith('I'):
+            value_buf += question[i]
+        elif l.startswith('O'):
+            if value_buf != '':
+                values.append(value_buf)
+                slots.append(slot_buf)
+            value_buf = ''
+            slot_buf = ''  
+    return slots, values
+
+
+def generate_graph_query(intent, slots, values, query_templates):
+    if intent not in query_templates.keys():
+        raise Exception(f"Query templates does not have a template for {intent}")
+    template = query_templates[intent]
+    query_expr = template.format(*values)
+    return query_expr
+
+
+def question2answer(question, query_templates, nlu_endpoint_name):
+    _, intentions, slot_labels = parse_questions([question], nlu_endpoint_name)
+    print(f"Intention: {intentions[0]}")
+    slots, values = extract_slot_values(question, slot_labels[0])
+    print(f"Slot labels: {slots},{values}")
+    query_expr = generate_graph_query(intentions[0], slots, values, query_templates)
+    print(f"Query: {query_expr}")
+    return query(query_expr)
 
 
 def prepare_iamdb_request(database_url):
@@ -122,19 +191,26 @@ def reset_connection_if_connection_issue(params):
                       interval=1)
 def query(**kwargs):
 
-    id = kwargs['id']
-
-    return (g.V(id)
-            .fold()
-            .coalesce(
-        __.unfold(),
-        __.addV('User').property(T.id, id)
-    )
-        .id().next())
+    expr = kwargs['expr']
+    result_code = 'SUCCEEDED'
+    try:
+        result = eval(expr)
+    except Exception as e:
+        result_code = 'FAILED'
+        result = str(e)
+    result_dict = {
+        'result_code': result_code,
+        'result': result
+    }
+    return result_dict
 
 
 def doQuery(event):
-    return query(id=str(randint(0, 10000)))
+    question = event['question']
+    with open('chatbot_resource/query_templates.json') as f:
+        query_templates = json.load(f)
+    nlu_endpoint_name = os.environ['nluEndpoint']
+    return question2answer(question, query_templates, nlu_endpoint_name)
 
 
 def lambda_handler(event, context):
@@ -156,9 +232,12 @@ def create_remote_connection():
 
 
 def connection_string():
-
-    database_url = 'wss://{}:{}/gremlin'.format(
-        os.environ['neptuneEndpoint'], os.environ['neptunePort'])
+    if port == 80 or port == '80': # use unencrypted web socket if port is an http port
+        database_url = 'ws://{}:{}/gremlin'.format(
+            os.environ['neptuneEndpoint'], os.environ['neptunePort'])
+    else:
+        database_url = 'wss://{}:{}/gremlin'.format(
+            os.environ['neptuneEndpoint'], os.environ['neptunePort'])
 
     if 'USE_IAM' in os.environ and os.environ['USE_IAM'] == 'true':
         return prepare_iamdb_request(database_url)

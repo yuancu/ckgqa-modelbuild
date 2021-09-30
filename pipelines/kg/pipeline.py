@@ -531,7 +531,7 @@ def get_step_bulkload(bucket, region, role, params, dependencies, properties):
             "--neptune-endpoint",
             db_cluster_endpoint,
             "--neptune-port",
-            db_cluster_port
+            str(db_cluster_port)
         ],
     )
     bulkload_step.add_depends_on([dependencies['step_create_db']])

@@ -207,7 +207,7 @@ def query(**kwargs):
 
 def doQuery(event):
     question = event['question']
-    with open('chatbot_resource/query_templates.json') as f:
+    with open('query_templates.json') as f:
         query_templates = json.load(f)
     nlu_endpoint_name = os.environ['nluEndpoint']
     return question2answer(question, query_templates, nlu_endpoint_name)

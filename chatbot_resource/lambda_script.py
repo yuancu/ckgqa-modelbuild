@@ -232,6 +232,7 @@ def create_remote_connection():
 
 
 def connection_string():
+    port = os.environ['neptunePort']
     if port == 80 or port == '80': # use unencrypted web socket if port is an http port
         database_url = 'ws://{}:{}/gremlin'.format(
             os.environ['neptuneEndpoint'], os.environ['neptunePort'])

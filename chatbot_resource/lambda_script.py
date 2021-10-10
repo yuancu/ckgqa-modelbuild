@@ -58,7 +58,7 @@ network_errors = [WebSocketClosedError, OSError]
 retriable_errors = [GremlinServerError] + network_errors
 
 
-def parse_questions(questions, nlu_endpoint_name, sagemaker_session):
+def parse_questions(questions, nlu_endpoint_name):
     '''
     Args:
         questions (list(str)): A list of natural language questions
@@ -67,7 +67,7 @@ def parse_questions(questions, nlu_endpoint_name, sagemaker_session):
     sess = sagemaker.Session()
     predictor = PyTorchPredictor(
         endpoint_name=nlu_endpoint_name,
-        sagemaker_session=sagemaker_session,
+        sagemaker_session=sess,
         serializer=CSVSerializer(),
         deserializer=JSONDeserializer(),
     )

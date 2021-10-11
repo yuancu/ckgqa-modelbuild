@@ -115,7 +115,7 @@ def question2answer(question, query_templates, nlu_endpoint_name):
     print(f"Slot labels: {slots},{values}")
     query_expr = generate_graph_query(intentions[0], slots, values, query_templates)
     print(f"Query: {query_expr}")
-    return query(query_expr)
+    return query(expr=query_expr)
 
 
 def prepare_iamdb_request(database_url):

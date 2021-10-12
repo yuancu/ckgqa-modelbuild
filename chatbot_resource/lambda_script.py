@@ -206,7 +206,10 @@ def query(**kwargs):
 
 
 def doQuery(event):
-    question = event['question']
+    if 'q' in event['queryStringParameters'].keys():
+        question = event['queryStringParameters']['q']
+    else:
+        question = event['queryStringParameters']['question']
     with open('query_templates.json') as f:
         query_templates = json.load(f)
     nlu_endpoint_name = os.environ['nluEndpoint']
